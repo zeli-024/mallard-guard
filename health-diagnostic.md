@@ -18,7 +18,7 @@ Anchors read visible boss-bar positions, shared HUD heights and the vanilla offh
 
 ## Defaults and persistence
 
-Player and shield windows are 2 perfect ticks within 4 total ticks. Hitlag uses 3 perfect/1 regular ticks with Perfect Only Off. Experimental Highlight remains Off; its defaults are Perfect Only On, Before, 6 ticks, 60% dim and 80% glow. The shield icon defaults On at Bottom Center, with 100% size, with regular/perfect/block expansions Off and guard-break expansion, Lift and existing echoes retained. Other strengths, palettes and saved custom settings remain intact.
+Player and shield windows are 2 perfect ticks within 4 total ticks. Hitlag uses 3 perfect/1 regular ticks with Perfect Only Off. Experimental Highlight remains Off; its defaults are Perfect Only On, Before, 6 ticks, 60% dim and 80% glow. The shield icon defaults On at Bottom Center, with 100% size, with regular/perfect/block expansions Off and guard-break expansion, Lift and existing echoes retained. Mob spark colors default white; Flying Sparks and Spark Debris have separate server-owned color controls. Saved custom settings remain intact.
 
 Config revision 101 and preset revision 95 retain old keys and slot positions. Five HUD slots are appended; old preset lengths fill them from defaults. Matching clients/server use protocol 75. Existing config transfer bounds and save rollback remain in place.
 

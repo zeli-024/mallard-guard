@@ -95,12 +95,12 @@ public final class GuardConfig {
     public static final ModConfigSpec.BooleanValue FIRST_PERSON_ANIMATION, THIRD_PERSON_ANIMATION, MOB_GUARD;
     public static final ModConfigSpec.BooleanValue MOB_REGULAR_RETALIATION, MOB_PERFECT_RETALIATION;
     public static final ModConfigSpec.ConfigValue<String> MOB_WHITELIST, MOB_GEAR_WHITELIST, MOB_GEAR_BLACKLIST;
-    public static final ModConfigSpec.IntValue MOB_TRACER_START, MOB_TRACER_MIDDLE, MOB_TRACER_END;
+    public static final ModConfigSpec.IntValue MOB_FLYING_COLOR, MOB_DEBRIS_COLOR, MOB_TRACER_START, MOB_TRACER_MIDDLE, MOB_TRACER_END;
     public static final ModConfigSpec.IntValue MOB_APPROACH_CHANCE, MOB_TACTICAL_CHANCE, MOB_TACTICAL_SECONDS, MOB_TACTICAL_COOLDOWN, MOB_MOVEMENT, MOB_APPROACH_DISTANCE, MOB_APPROACH_SECONDS, MOB_RUSH_CHANCE, MOB_GEAR_CHANCE;
     public static final ModConfigSpec.IntValue MOB_COUNTER_TICKS, MOB_DIFFICULTY, MOB_HITS_TO_GUARD, MOB_PERFECT_TICKS;
     public static final ModConfigSpec.IntValue LOCAL_MASTER_VOLUME, LOCAL_PARRY_VOLUME, LOCAL_PERFECT_VOLUME, LOCAL_BLOCK_VOLUME;
     // This changes only when the config schema or a default changes, never with the mod version.
-    static final int CONFIG_REVISION = 101;
+    static final int CONFIG_REVISION = 102;
     private static final ModConfigSpec.IntValue SERVER_REVISION;
     private static final ModConfigSpec.IntValue CLIENT_REVISION;
     private static final ModConfigSpec.IntValue PUNCHY_REVISION;
@@ -249,9 +249,11 @@ public final class GuardConfig {
             .define("gearWhitelist", DEFAULT_MOB_GEAR, value -> value instanceof String rules && GuardItemRules.valid(rules));
         MOB_GEAR_BLACKLIST = server.comment("Disallowed mob spawn equipment; overrides the whitelist. Default: empty. Items absent from the whitelist are not generated.")
             .define("gearBlacklist", "", value -> value instanceof String rules && GuardItemRules.valid(rules));
-        MOB_TRACER_START = GuardSettingRanges.integer(server.comment("Mob tracer color at spawn; also colors the beginning of its impact. Default: #FF0000."), "tracerStartColor", 0xFF0000, 0, 0xFFFFFF);
-        MOB_TRACER_MIDDLE = GuardSettingRanges.integer(server.comment("Mob tracer color halfway through fading; also colors the middle of its impact. Default: #FF0000."), "tracerMiddleColor", 0xFF0000, 0, 0xFFFFFF);
-        MOB_TRACER_END = GuardSettingRanges.integer(server.comment("Mob tracer color near disappearance; also colors the end of its impact. Default: #FF0000."), "tracerEndColor", 0xFF0000, 0, 0xFFFFFF);
+        MOB_FLYING_COLOR = GuardSettingRanges.integer(server.comment("Mob Flying Sparks base color. Default: #FFFFFF."), "flyingSparkColor", 0xFFFFFF, 0, 0xFFFFFF);
+        MOB_DEBRIS_COLOR = GuardSettingRanges.integer(server.comment("Mob Spark Debris color. Default: #FFFFFF."), "sparkDebrisColor", 0xFFFFFF, 0, 0xFFFFFF);
+        MOB_TRACER_START = GuardSettingRanges.integer(server.comment("Mob tracer color at spawn; also colors the beginning of its impact. Default: #FFFFFF."), "tracerStartColor", 0xFFFFFF, 0, 0xFFFFFF);
+        MOB_TRACER_MIDDLE = GuardSettingRanges.integer(server.comment("Mob tracer color halfway through fading; also colors the middle of its impact. Default: #FFFFFF."), "tracerMiddleColor", 0xFFFFFF, 0, 0xFFFFFF);
+        MOB_TRACER_END = GuardSettingRanges.integer(server.comment("Mob tracer color near disappearance; also colors the end of its impact. Default: #FFFFFF."), "tracerEndColor", 0xFFFFFF, 0, 0xFFFFFF);
         server.pop();
 
         SERVER_SPEC = server.build();
@@ -830,6 +832,8 @@ public final class GuardConfig {
             defaults ? MOB_GEAR_CHANCE.getDefault() : MOB_GEAR_CHANCE.get(),
             defaults ? MOB_GEAR_WHITELIST.getDefault() : MOB_GEAR_WHITELIST.get(),
             defaults ? MOB_GEAR_BLACKLIST.getDefault() : MOB_GEAR_BLACKLIST.get(),
+            defaults ? MOB_FLYING_COLOR.getDefault() : MOB_FLYING_COLOR.get(),
+            defaults ? MOB_DEBRIS_COLOR.getDefault() : MOB_DEBRIS_COLOR.get(),
             defaults ? MOB_TRACER_START.getDefault() : MOB_TRACER_START.get(),
             defaults ? MOB_TRACER_MIDDLE.getDefault() : MOB_TRACER_MIDDLE.get(),
             defaults ? MOB_TRACER_END.getDefault() : MOB_TRACER_END.get());

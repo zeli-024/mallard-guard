@@ -203,7 +203,7 @@ public final class GuardPackets {
             buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readUtf(1024), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readUtf(GuardItemRules.MAX_LENGTH), buf.readUtf(GuardItemBlockCounts.MAX_LENGTH), buf.readBoolean(),buf.readBoolean(),buf.readVarInt(),buf.readVarInt(),buf.readBoolean(),buf.readVarInt(),buf.readBoolean(),buf.readBoolean(),buf.readBoolean(),buf.readVarInt());
     }
 
-    public record MobSettings(boolean enabled, int difficulty, String whitelist, int gearChance, String gearWhitelist, String gearBlacklist, int tracerStartColor, int tracerMiddleColor, int tracerEndColor) implements CustomPacketPayload {
+    public record MobSettings(boolean enabled, int difficulty, String whitelist, int gearChance, String gearWhitelist, String gearBlacklist, int flyingColor, int debrisColor, int tracerStartColor, int tracerMiddleColor, int tracerEndColor) implements CustomPacketPayload {
         public static final Type<MobSettings> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "mob_settings"));
         public static final StreamCodec<RegistryFriendlyByteBuf, MobSettings> CODEC = StreamCodec.of(GuardPackets::writeMobs, GuardPackets::readMobs);
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
@@ -217,10 +217,10 @@ public final class GuardPackets {
     private static void writeMobs(RegistryFriendlyByteBuf buf, MobSettings data) {
         buf.writeBoolean(data.enabled());buf.writeVarInt(data.difficulty());buf.writeUtf(data.whitelist(),1024);
         buf.writeVarInt(data.gearChance());buf.writeUtf(data.gearWhitelist(),GuardItemRules.MAX_LENGTH);buf.writeUtf(data.gearBlacklist(),GuardItemRules.MAX_LENGTH);
-        buf.writeInt(data.tracerStartColor());buf.writeInt(data.tracerMiddleColor());buf.writeInt(data.tracerEndColor());
+        buf.writeInt(data.flyingColor());buf.writeInt(data.debrisColor());buf.writeInt(data.tracerStartColor());buf.writeInt(data.tracerMiddleColor());buf.writeInt(data.tracerEndColor());
     }
     private static MobSettings readMobs(RegistryFriendlyByteBuf buf) {
-        return new MobSettings(buf.readBoolean(),buf.readVarInt(),buf.readUtf(1024),buf.readVarInt(),buf.readUtf(GuardItemRules.MAX_LENGTH),buf.readUtf(GuardItemRules.MAX_LENGTH),buf.readInt(),buf.readInt(),buf.readInt());
+        return new MobSettings(buf.readBoolean(),buf.readVarInt(),buf.readUtf(1024),buf.readVarInt(),buf.readUtf(GuardItemRules.MAX_LENGTH),buf.readUtf(GuardItemRules.MAX_LENGTH),buf.readInt(),buf.readInt(),buf.readInt(),buf.readInt(),buf.readInt());
     }
     public record StunState(int ticks) implements CustomPacketPayload {
         public static final Type<StunState> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID,"stun_state"));
@@ -300,17 +300,17 @@ public final class GuardPackets {
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
-    public record Sparks(double x,double y,double z,boolean perfect,boolean defender,float damage,float facingX,float facingY,float facingZ,boolean shield,boolean fall,int paletteId,int tracerStartColor,int tracerMiddleColor,int tracerEndColor) implements CustomPacketPayload {
+    public record Sparks(double x,double y,double z,boolean perfect,boolean defender,float damage,float facingX,float facingY,float facingZ,boolean shield,boolean fall,int paletteId,int flyingColor,int debrisColor,int tracerStartColor,int tracerMiddleColor,int tracerEndColor) implements CustomPacketPayload {
         public static final Type<Sparks> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID,"sparks"));
         public static final StreamCodec<RegistryFriendlyByteBuf,Sparks> CODEC=StreamCodec.of(
             (buf,data)->{buf.writeDouble(data.x);buf.writeDouble(data.y);buf.writeDouble(data.z);buf.writeBoolean(data.perfect);buf.writeBoolean(data.defender);buf.writeFloat(data.damage);buf.writeFloat(data.facingX);buf.writeFloat(data.facingY);buf.writeFloat(data.facingZ);buf.writeBoolean(data.shield);buf.writeBoolean(data.fall);buf.writeVarInt(data.paletteId);
-                boolean colored=data.tracerStartColor>=0;buf.writeBoolean(colored);if(colored){buf.writeInt(data.tracerStartColor);buf.writeInt(data.tracerMiddleColor);buf.writeInt(data.tracerEndColor);}},GuardPackets::readSparks);
+                boolean colored=data.tracerStartColor>=0;buf.writeBoolean(colored);if(colored){buf.writeInt(data.flyingColor);buf.writeInt(data.debrisColor);buf.writeInt(data.tracerStartColor);buf.writeInt(data.tracerMiddleColor);buf.writeInt(data.tracerEndColor);}},GuardPackets::readSparks);
         @Override public Type<? extends CustomPacketPayload> type(){return TYPE;}
     }
     private static Sparks readSparks(RegistryFriendlyByteBuf buf){
         double x=buf.readDouble(),y=buf.readDouble(),z=buf.readDouble();boolean perfect=buf.readBoolean(),defender=buf.readBoolean();
         float damage=buf.readFloat(),fx=buf.readFloat(),fy=buf.readFloat(),fz=buf.readFloat();boolean shield=buf.readBoolean(),fall=buf.readBoolean();int paletteId=buf.readVarInt();boolean colored=buf.readBoolean();
-        return new Sparks(x,y,z,perfect,defender,damage,fx,fy,fz,shield,fall,paletteId,colored?buf.readInt():-1,colored?buf.readInt():-1,colored?buf.readInt():-1);
+        return new Sparks(x,y,z,perfect,defender,damage,fx,fy,fz,shield,fall,paletteId,colored?buf.readInt():-1,colored?buf.readInt():-1,colored?buf.readInt():-1,colored?buf.readInt():-1,colored?buf.readInt():-1);
     }
 
     public record HitSound(double x, double y, double z, int kind, int variant, float volume,
@@ -417,7 +417,7 @@ public final class GuardPackets {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("75");
+        PayloadRegistrar registrar = event.registrar("76");
         registrar.playToServer(SetPalette.TYPE, SetPalette.CODEC, GuardPlayerPalettes::receivePalette);
         registrar.playToClient(PlayerPalette.TYPE, PlayerPalette.CODEC, (data, context) -> GuardClient.playerPalette(data));
         registrar.playToServer(FeintEnded.TYPE, FeintEnded.CODEC, (data, context) -> {
@@ -574,11 +574,14 @@ public final class GuardPackets {
         if (!GuardSettingRanges.accepts(GuardConfig.MOB_DIFFICULTY,data.difficulty())
             ||!GuardSettingRanges.accepts(GuardConfig.MOB_GEAR_CHANCE,data.gearChance())
             ||!GuardItemRules.validEntityIds(data.whitelist())||!GuardItemRules.valid(data.gearWhitelist())||!GuardItemRules.valid(data.gearBlacklist())
+            ||!GuardSettingRanges.accepts(GuardConfig.MOB_FLYING_COLOR,data.flyingColor())
+            ||!GuardSettingRanges.accepts(GuardConfig.MOB_DEBRIS_COLOR,data.debrisColor())
             ||!GuardSettingRanges.accepts(GuardConfig.MOB_TRACER_START,data.tracerStartColor())
             ||!GuardSettingRanges.accepts(GuardConfig.MOB_TRACER_MIDDLE,data.tracerMiddleColor())
             ||!GuardSettingRanges.accepts(GuardConfig.MOB_TRACER_END,data.tracerEndColor()))return false;
         GuardConfig.MOB_GUARD.set(data.enabled());GuardConfig.MOB_DIFFICULTY.set(data.difficulty());GuardConfig.MOB_WHITELIST.set(data.whitelist());
         GuardConfig.MOB_GEAR_CHANCE.set(data.gearChance());GuardConfig.MOB_GEAR_WHITELIST.set(data.gearWhitelist());GuardConfig.MOB_GEAR_BLACKLIST.set(data.gearBlacklist());
+        GuardConfig.MOB_FLYING_COLOR.set(data.flyingColor());GuardConfig.MOB_DEBRIS_COLOR.set(data.debrisColor());
         GuardConfig.MOB_TRACER_START.set(data.tracerStartColor());GuardConfig.MOB_TRACER_MIDDLE.set(data.tracerMiddleColor());GuardConfig.MOB_TRACER_END.set(data.tracerEndColor());
         GuardConfig.persistServer();
         GuardConfig.afterServerSave(()->{for(ServerPlayer connected:player.serverLevel().getServer().getPlayerList().getPlayers())GuardConfigTransfer.sendConfigData(connected,data);});

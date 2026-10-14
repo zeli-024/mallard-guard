@@ -17,7 +17,7 @@ final class GuardConfigSearch {
 
     private static List<Entry> catalogue() {
         List<Entry> all = new ArrayList<>();
-        addSearchEntries(all,3,12,"Mob Guard","Mob guarding|Mob guard difficulty|Parry Colors|Mob Tracer Start Color|Mob Tracer Middle Color|Mob Tracer End Color|Spawn Equipment|Mob gear chance|Mob Gear Assignments|Mob Eligibility|Mob Guard Whitelist");
+        addSearchEntries(all,3,12,"Mob Guard","Mob guarding|Mob guard difficulty|Parry Colors|Mob Flying Sparks Color|Mob Spark Debris Color|Mob Tracer Start Color|Mob Tracer Middle Color|Mob Tracer End Color|Spawn Equipment|Mob gear chance|Mob Gear Assignments|Mob Eligibility|Mob Guard Whitelist");
         addSearchEntries(all, 0, 7, "World Particles", "Shield Forward Bias|Flying Sparks|Base Intensity|Perfect Intensity|Damage Intensity|"+String.join("|",new String[]{"Flying Size","Flying Size Variance","Flying Lifetime","Flying Base Color"})
             +"|Spark Debris|Debris Base Intensity|Debris Perfect Intensity|Debris Damage Intensity|"+String.join("|",new String[]{"Debris Size","Debris Lifetime","Debris Base Color"})
             +"|Spark Tracers|Tracer Base Intensity|Tracer Perfect Intensity|Tracer Damage Intensity|"+String.join("|",new String[]{"Tracer Size","Tracer Lifetime","Tracer Tail Length","Tracer Start Color","Tracer Middle Color","Tracer End Color"})

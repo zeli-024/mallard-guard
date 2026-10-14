@@ -9,6 +9,9 @@ final class GuardConfigMigration {
     private GuardConfigMigration() {}
     private record DefaultChange(int revision, String path, String previous, String current) {}
     private static final List<DefaultChange> DEFAULT_CHANGES = List.of(
+        new DefaultChange(102,"mobs.tracerStartColor","16711680","16777215"),
+        new DefaultChange(102,"mobs.tracerMiddleColor","16711680","16777215"),
+        new DefaultChange(102,"mobs.tracerEndColor","16711680","16777215"),
         new DefaultChange(101,"display.hitlagTicks","6","3"),
         new DefaultChange(101,"display.iconAnchor","0","6"),
         new DefaultChange(100,"timing.parryTicks","6","4"),

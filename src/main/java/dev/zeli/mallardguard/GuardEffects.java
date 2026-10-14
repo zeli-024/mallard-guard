@@ -110,10 +110,11 @@ public final class GuardEffects {
             result==GuardState.Result.PERFECT,false,Float.isFinite(damage)?Math.max(0,damage):0,
             (float)facing.x,(float)facing.y,(float)facing.z,shield,source.is(DamageTypes.FALL)||source.is(DamageTypes.FLY_INTO_WALL),
             player instanceof ServerPlayer serverPlayer ? GuardPlayerPalettes.playerPaletteId(serverPlayer) : 0,
+            mobPalette?GuardConfig.MOB_FLYING_COLOR.get():-1,mobPalette?GuardConfig.MOB_DEBRIS_COLOR.get():-1,
             mobPalette?GuardConfig.MOB_TRACER_START.get():-1,mobPalette?GuardConfig.MOB_TRACER_MIDDLE.get():-1,mobPalette?GuardConfig.MOB_TRACER_END.get():-1);
         for (ServerPlayer viewer : level.players()) {
             if (viewer.distanceToSqr(center) <= 32.0D * 32.0D) PacketDistributor.sendToPlayer(viewer, (viewer == player || player instanceof net.minecraft.world.entity.Mob && result == GuardState.Result.PERFECT && source.getEntity() == viewer)
-                ? new GuardPackets.Sparks(packet.x(),packet.y(),packet.z(),packet.perfect(),true,packet.damage(),packet.facingX(),packet.facingY(),packet.facingZ(),packet.shield(),packet.fall(),packet.paletteId(),packet.tracerStartColor(),packet.tracerMiddleColor(),packet.tracerEndColor()) : packet);
+                ? new GuardPackets.Sparks(packet.x(),packet.y(),packet.z(),packet.perfect(),true,packet.damage(),packet.facingX(),packet.facingY(),packet.facingZ(),packet.shield(),packet.fall(),packet.paletteId(),packet.flyingColor(),packet.debrisColor(),packet.tracerStartColor(),packet.tracerMiddleColor(),packet.tracerEndColor()) : packet);
         }
     }
 }

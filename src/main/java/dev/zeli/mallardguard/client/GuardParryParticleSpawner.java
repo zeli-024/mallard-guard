@@ -25,9 +25,9 @@ public final class GuardParryParticleSpawner {
         synchronized (GuardParryParticleRenderer.STATE_LOCK) {
             var mc=Minecraft.getInstance();
             if(mc.level==null || !Float.isFinite(hit.damage()) || hit.damage()<0)return;
-            boolean colored=hit.tracerStartColor()>=0&&hit.tracerStartColor()<=0xFFFFFF&&hit.tracerMiddleColor()>=0&&hit.tracerMiddleColor()<=0xFFFFFF&&hit.tracerEndColor()>=0&&hit.tracerEndColor()<=0xFFFFFF;
+            boolean colored=hit.flyingColor()>=0&&hit.flyingColor()<=0xFFFFFF&&hit.debrisColor()>=0&&hit.debrisColor()<=0xFFFFFF&&hit.tracerStartColor()>=0&&hit.tracerStartColor()<=0xFFFFFF&&hit.tracerMiddleColor()>=0&&hit.tracerMiddleColor()<=0xFFFFFF&&hit.tracerEndColor()>=0&&hit.tracerEndColor()<=0xFFFFFF;
             GuardPackets.Palette colors = (playerPalette==null?GuardPackets.Palette.readLocal():playerPalette);
-            if(colored)colors=new GuardPackets.Palette(hit.tracerStartColor(),hit.tracerStartColor(),hit.tracerStartColor(),hit.tracerMiddleColor(),hit.tracerEndColor());
+            if(colored)colors=new GuardPackets.Palette(hit.flyingColor(),hit.debrisColor(),hit.tracerStartColor(),hit.tracerMiddleColor(),hit.tracerEndColor());
             if(GuardImpactParticle.enabled()){
                 var impact=mc.particleEngine.createParticle(GuardParticles.CENTER_IMPACT.get(),hit.x(),hit.y(),hit.z(),0,0,0);
                 if(colors!=null)palette(impact,colors);

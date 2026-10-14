@@ -18,6 +18,8 @@ final class GuardConfigDraft {
     String mobWhitelist;
     String mobGearWhitelist;
     String mobGearBlacklist;
+    int mobFlyingColor;
+    int mobDebrisColor;
     int mobTracerStartColor;
     int mobTracerMiddleColor;
     int mobTracerEndColor;
@@ -130,6 +132,8 @@ final class GuardConfigDraft {
         new Field<String>("mobWhitelist", () -> mobWhitelist, value -> mobWhitelist = value, GuardPackets.SAVE_MOBS),
         new Field<String>("mobGearWhitelist", () -> mobGearWhitelist, value -> mobGearWhitelist = value, GuardPackets.SAVE_MOBS),
         new Field<String>("mobGearBlacklist", () -> mobGearBlacklist, value -> mobGearBlacklist = value, GuardPackets.SAVE_MOBS),
+        new Field<Integer>("mobFlyingColor", () -> mobFlyingColor, value -> mobFlyingColor = value, GuardPackets.SAVE_MOBS),
+        new Field<Integer>("mobDebrisColor", () -> mobDebrisColor, value -> mobDebrisColor = value, GuardPackets.SAVE_MOBS),
         new Field<Integer>("mobTracerStartColor", () -> mobTracerStartColor, value -> mobTracerStartColor = value, GuardPackets.SAVE_MOBS),
         new Field<Integer>("mobTracerMiddleColor", () -> mobTracerMiddleColor, value -> mobTracerMiddleColor = value, GuardPackets.SAVE_MOBS),
         new Field<Integer>("mobTracerEndColor", () -> mobTracerEndColor, value -> mobTracerEndColor = value, GuardPackets.SAVE_MOBS),

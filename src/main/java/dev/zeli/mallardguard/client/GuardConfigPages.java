@@ -32,11 +32,13 @@ final class GuardConfigPages {
                 screen.pageControls(screen.configDraft.mobGuard);
                 screen.sliderBound(Control.MOB_DIFFICULTY, "Mob guard difficulty",()->screen.configDraft.mobDifficulty,"%",1,true,v->{screen.configDraft.mobDifficulty=v;screen.dirtyMobs=true;},
                     "Scale chance-based guard, rush and repeat-guard decisions.\n100% uses normal chances; 50% halves them; 0% stops new decisions.");
-                screen.dropdown("Parry Colors",()->screen.mobColorsOpen,"Mob tracers and their impact share these three colors.");
+                screen.dropdown("Parry Colors",()->screen.mobColorsOpen,"Choose each mob particle family’s colors.\nThe impact uses the tracer’s Start/Middle/End colors.");
                 if(screen.mobColorsOpen){
-                    screen.colorField(Control.MOB_TRACER_START, "Mob Tracer Start Color",()->screen.configDraft.mobTracerStartColor,v->screen.configDraft.mobTracerStartColor=v,true,"Color at spawn. Also colors the start of the mob impact.\nDefault: #FF0000.");
-                    screen.colorField(Control.MOB_TRACER_MIDDLE, "Mob Tracer Middle Color",()->screen.configDraft.mobTracerMiddleColor,v->screen.configDraft.mobTracerMiddleColor=v,true,"Color halfway through fading. Also colors the middle of the impact.\nDefault: #FF0000.");
-                    screen.colorField(Control.MOB_TRACER_END, "Mob Tracer End Color",()->screen.configDraft.mobTracerEndColor,v->screen.configDraft.mobTracerEndColor=v,true,"Color near disappearance. Also colors the end of the impact.\nDefault: #FF0000.");
+                    screen.colorField(Control.MOB_FLYING_COLOR, "Mob Flying Sparks Color",()->screen.configDraft.mobFlyingColor,v->screen.configDraft.mobFlyingColor=v,true,"Base color of mob Flying Sparks.\nDefault: #FFFFFF.");
+                    screen.colorField(Control.MOB_DEBRIS_COLOR, "Mob Spark Debris Color",()->screen.configDraft.mobDebrisColor,v->screen.configDraft.mobDebrisColor=v,true,"Color of mob Spark Debris.\nDefault: #FFFFFF.");
+                    screen.colorField(Control.MOB_TRACER_START, "Mob Tracer Start Color",()->screen.configDraft.mobTracerStartColor,v->screen.configDraft.mobTracerStartColor=v,true,"Color at spawn. Also colors the start of the mob impact.\nDefault: #FFFFFF.");
+                    screen.colorField(Control.MOB_TRACER_MIDDLE, "Mob Tracer Middle Color",()->screen.configDraft.mobTracerMiddleColor,v->screen.configDraft.mobTracerMiddleColor=v,true,"Color halfway through fading. Also colors the middle of the impact.\nDefault: #FFFFFF.");
+                    screen.colorField(Control.MOB_TRACER_END, "Mob Tracer End Color",()->screen.configDraft.mobTracerEndColor,v->screen.configDraft.mobTracerEndColor=v,true,"Color near disappearance. Also colors the end of the impact.\nDefault: #FFFFFF.");
                 }
                 screen.dropdown("Spawn Equipment",()->screen.mobEquipmentOpen,"Assign equipment for fresh whitelisted vanilla mobs.\nDifficulty does not affect gear chance.");
                 if(screen.mobEquipmentOpen){

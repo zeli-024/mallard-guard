@@ -296,6 +296,7 @@ public final class GuardConfigScreen extends Screen {
     private void setMobSettings(GuardPackets.MobSettings data) {
         configDraft.mobGuard=data.enabled();configDraft.mobDifficulty=data.difficulty();configDraft.mobWhitelist=data.whitelist();configDraft.mobGearChance=data.gearChance();
         configDraft.mobGearWhitelist=data.gearWhitelist();configDraft.mobGearBlacklist=data.gearBlacklist();
+        configDraft.mobFlyingColor=data.flyingColor();configDraft.mobDebrisColor=data.debrisColor();
         configDraft.mobTracerStartColor=data.tracerStartColor();configDraft.mobTracerMiddleColor=data.tracerMiddleColor();configDraft.mobTracerEndColor=data.tracerEndColor();
     }
 
@@ -680,10 +681,15 @@ public final class GuardConfigScreen extends Screen {
     }
     private String originalText(String name,String fallback){
         if(appliedState!=null)for(int i=GuardParticleColors.OFFSET;i<GuardParticleColors.LENGTH;i++)if(GuardParticleColors.colorSlot(i)&&name.equals(GuardParticleColors.LABELS[i-GuardParticleColors.OFFSET]))for(var entry:appliedState.fields().entrySet())if(entry.getKey().equals(enforceSection?"enforcedDefaults":"extraClient"))return String.format("#%06X",((int[])entry.getValue())[i]);
-        if(appliedState!=null&&name.startsWith("Mob Tracer ")){
-            String colorField=name.equals("Mob Tracer Start Color")?"mobTracerStartColor":name.equals("Mob Tracer Middle Color")?"mobTracerMiddleColor":"mobTracerEndColor";
-            for(var entry:appliedState.fields().entrySet())if(entry.getKey().equals(colorField))return String.format("#%06X",((Number)entry.getValue()).intValue());
-        }
+        String mobColorField=switch(name){
+            case "Mob Flying Sparks Color"->"mobFlyingColor";
+            case "Mob Spark Debris Color"->"mobDebrisColor";
+            case "Mob Tracer Start Color"->"mobTracerStartColor";
+            case "Mob Tracer Middle Color"->"mobTracerMiddleColor";
+            case "Mob Tracer End Color"->"mobTracerEndColor";
+            default->"";
+        };
+        if(appliedState!=null&&!mobColorField.isEmpty())for(var entry:appliedState.fields().entrySet())if(entry.getKey().equals(mobColorField))return String.format("#%06X",((Number)entry.getValue()).intValue());
         String field=switch(name){case "Item Whitelist"->"includedItems";case "Item Blacklist"->"excludedItems";case "Shield Item Whitelist","Extra shields and tags"->"shieldItems";case "Shield Item Blacklist"->"shieldBlacklist";case "Item Block Counts"->"itemBlockCounts";case "Stunnable bosses"->"stunnableBosses";case "Mob Guard Whitelist"->"mobWhitelist";case "Mob Gear Whitelist"->"mobGearWhitelist";case "Mob Gear Blacklist"->"mobGearBlacklist";default->"";};if(appliedState!=null)for(var entry:appliedState.fields().entrySet())if(entry.getKey().equals(field))return String.valueOf(entry.getValue());return fallback;}
     private static boolean sameSetting(String field,Object current,Object saved){
         if(field.equals("damageRules")&&current instanceof Map<?,?> a&&saved instanceof Map<?,?> b){
@@ -1544,7 +1550,7 @@ public final class GuardConfigScreen extends Screen {
         }
         GuardPackets.Save rulesSave = operator && dirtyServerRules ? new GuardPackets.Save(configDraft.parry, configDraft.block, configDraft.parryDrowningFire, configDraft.parryStarvation, configDraft.parryGenericKill, configDraft.perfect, configDraft.window, configDraft.recharge, configDraft.angle, configDraft.reductionPercent, configDraft.followUp, configDraft.parryReturnPercent, configDraft.perfectReturnPercent, configDraft.parryWear, configDraft.perfectWear, configDraft.blockWear, configDraft.serverHitSounds, configDraft.hitParticles, configDraft.serverMasterVolume, configDraft.serverPerfectVolume, configDraft.serverParryVolume, configDraft.serverBlockVolume, configDraft.fallParry, true, true, configDraft.fallBreakBlocks, configDraft.fallBlastStrength, configDraft.fallLaunchPower, configDraft.parryExplosions, configDraft.perfectExplosionsOnly, configDraft.blockExplosions, configDraft.parryProjectiles, configDraft.blockProjectiles, configDraft.knockbackStrength > 0, configDraft.knockbackStrength, configDraft.guardMovementPercent, configDraft.blockDeflectChance, configDraft.allowAnyItem, configDraft.allowUsableItems, configDraft.includedItems, configDraft.excludedItems, configDraft.shieldItems, configDraft.consumablePriority, configDraft.parryHealing, configDraft.parryHealingHearts) : null;
         GuardPackets.SaveMobs mobsSave = operator && dirtyMobs ? new GuardPackets.SaveMobs(new GuardPackets.MobSettings(
-            configDraft.mobGuard,configDraft.mobDifficulty,configDraft.mobWhitelist,configDraft.mobGearChance,configDraft.mobGearWhitelist,configDraft.mobGearBlacklist,configDraft.mobTracerStartColor,configDraft.mobTracerMiddleColor,configDraft.mobTracerEndColor)) : null;
+            configDraft.mobGuard,configDraft.mobDifficulty,configDraft.mobWhitelist,configDraft.mobGearChance,configDraft.mobGearWhitelist,configDraft.mobGearBlacklist,configDraft.mobFlyingColor,configDraft.mobDebrisColor,configDraft.mobTracerStartColor,configDraft.mobTracerMiddleColor,configDraft.mobTracerEndColor)) : null;
         if (operator && dirtyShield) configDraft.shieldBreakTicks = Math.max(configDraft.recharge, configDraft.shieldBreakTicks);
         GuardPackets.SaveShield shieldSave = operator && dirtyShield ? new GuardPackets.SaveShield(new GuardPackets.ShieldSettings(
             configDraft.shieldPerfect, configDraft.shieldWindow, configDraft.shieldRechargeTicks, configDraft.shieldMaxBlocks, configDraft.toolMaxBlocks, Math.max(configDraft.recharge, configDraft.shieldBreakTicks), configDraft.shieldCone, configDraft.shieldReach, configDraft.shieldReturn,
