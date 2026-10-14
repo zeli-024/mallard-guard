@@ -37,21 +37,24 @@ final class GuardUi {
         int x=widget.getX(),y=widget.getY(),w=widget.getWidth(),h=widget.getHeight();
         g.fill(x,y,x+w,y+h,0xA0211B2A);
         g.renderOutline(x,y,w,h,changed?HIGHLIGHT:widget.isHoveredOrFocused()?HIGHLIGHT:BORDER);
-        int thumb=x+2+(int)(value*(w-7));g.fill(thumb,y+2,thumb+4,y+h-2,widget.active?WARM:0xFF62566B);
-        g.drawCenteredString(Minecraft.getInstance().font,widget.getMessage(),x+w/2,y+(h-8)/2,widget.active?TEXT:0xFF9B8EA4);
+        int thumb=x+2+(int)(value*(w-7));
+        g.fill(thumb,y+2,thumb+4,y+h-2,widget.active?HIGHLIGHT:0xFF62566B);
+        var font=Minecraft.getInstance().font;
+        g.drawCenteredString(font,font.plainSubstrByWidth(widget.getMessage().getString(),Math.max(0,w-8)),x+w/2,y+(h-8)/2,widget.active?TEXT:0xFF9B8EA4);
     }
+    static String enabledLabel(boolean enabled){return enabled?"Enabled":"Disabled";}
     record Choice(String label, Runnable action) {}
     static int accent(String text) {
-        if(text.equals("Undo"))return HIGHLIGHT;
         if(text.equals("On"))return 0xFFADD4AE;
+        if(text.equals("Undo"))return HIGHLIGHT;
         if (text.startsWith("Reset") || text.startsWith("Delete")) return 0xFFE79999;
         if (text.startsWith("Apply") || text.startsWith("Save") || text.startsWith("Confirm") || text.startsWith("Use")) return 0xFFADD4AE;
         return BORDER;
     }
     static int body(String label,boolean hover,boolean active) {
         if(!active)return 0x69292431;
-        if(label.equals("Undo"))return hover?0xBC927C48:0xA86E5B36;
         if(label.equals("On"))return hover?0xBC819C87:0xA86A8773;
+        if(label.equals("Undo"))return hover?0xBC927C48:0xA86E5B36;
         if(label.equals("Issue Tracker"))return hover?0xFF161F2D:0xFF0D1726;
         if(label.startsWith("Reset")||label.startsWith("Delete"))return hover?0xBC854457:0xA8623044;
         if(label.startsWith("Apply")||label.startsWith("Save")||label.startsWith("Confirm"))return hover?0xBC819C87:0xA86A8773;
@@ -73,17 +76,27 @@ final class GuardUi {
         };}
     }
     static Button button(String text,int x,int y,int w,int h,Runnable action){return builder(Component.literal(text),b->action.run()).bounds(x,y,w,h).build();}
+    static Button tab(String text,int x,int y,int w,boolean selected,Runnable action){
+        Button button=new Button(x,y,w,GuardUiLayout.CONTROL_HEIGHT,Component.literal(text),ignored->action.run(),message->message.get()){
+            @Override public void renderWidget(GuiGraphics g,int mx,int my,float d){paint(g,this,mx,my,selected,false);}
+        };
+        button.active=!selected;return button;
+    }
     static void paint(GuiGraphics g,Button button,int mx,int my,boolean selected,boolean red){
+        paint(g,button,mx,my,selected,red,true);
+    }
+    private static void paint(GuiGraphics g,Button button,int mx,int my,boolean selected,boolean red,boolean labelVisible){
         if(!button.visible)return;
         var font=Minecraft.getInstance().font;int x=button.getX(),y=button.getY(),w=button.getWidth(),h=button.getHeight();
         boolean hover=button.active&&button.isMouseOver(mx,my);String label=button.getMessage().getString();
         int edge=selected?0xFFD8BEAA:hover?0xFFC3A5BE:0xFF76647F;
-        if(label.equals("Undo")||label.equals("On")||label.startsWith("Reset")||label.startsWith("Apply")||label.startsWith("Save")||label.startsWith("Confirm")||label.startsWith("Delete"))edge=accent(label);
+        if(label.equals("On")||label.equals("Undo")||label.startsWith("Reset")||label.startsWith("Apply")||label.startsWith("Save")||label.startsWith("Confirm")||label.startsWith("Delete"))edge=accent(label);
         if(label.equals("Issue Tracker"))edge=hover?0xFF6D86A8:0xFF40516B;
         int fill=red?(hover?0xFF753E50:0xFF552B3C):selected?0x98493E55:body(label,hover,button.active);
         g.fill(x,y,x+w,y+h,edge);g.fill(x+1,y+1,x+w-1,y+h-1,fill);
         if(hover)g.fill(x+2,y+2,x+w-2,y+3,0x88F5E1F3);
         if(selected)g.fill(x+1,y+1,x+4,y+h-1,0xFFD8BEAA);
+        if(!labelVisible)return;
         int textColor=button.active||selected?0xFFF5F0F6:0xFF978C9E;
         if(label.equals("<")||label.equals(">")){
             chevron(g,x+(w-GuardUiLayout.ARROW_SIZE)/2,y+(h-GuardUiLayout.ARROW_SIZE)/2,label.equals("<")?2:0,textColor);
@@ -92,6 +105,12 @@ final class GuardUi {
             g.drawCenteredString(font,font.plainSubstrByWidth(text,w-GuardUiLayout.ARROW_SLOT-8),x+w/2,y+(h-8)/2,textColor);
             chevron(g,x+w-GuardUiLayout.ARROW_SIZE-GuardUiLayout.CONTROL_GAP,y+(h-GuardUiLayout.ARROW_SIZE)/2,1,textColor);
         }else g.drawCenteredString(font,font.plainSubstrByWidth(label,w-8),x+w/2,y+(h-8)/2,textColor);
+    }
+    static void listRow(GuiGraphics g,Button button,String detail,int mx,int my,boolean selected){
+        paint(g,button,mx,my,selected,false,false);
+        var font=Minecraft.getInstance().font;int x=button.getX()+9,w=button.getWidth()-18;
+        g.drawString(font,font.plainSubstrByWidth(button.getMessage().getString(),w),x,button.getY()+6,button.active?TEXT:MUTED);
+        g.drawString(font,font.plainSubstrByWidth(detail,w),x,button.getY()+20,MUTED);
     }
     static Button iconButton(String icon,String label,int x,int y,int size,Runnable action){
         Button b=new Button(x,y,size,size,Component.literal(label),ignored->action.run(),message->message.get()){
@@ -164,13 +183,13 @@ final class GuardUi {
             if(target.width>0&&target.height>0){backdrop=new com.mojang.blaze3d.pipeline.TextureTarget(target.width,target.height,false,false);GuardPreviewScreen.copy(target,backdrop);}
         }
         @Override protected void init(){
-            w=Math.min(anchorWidth+8,width-8);menuHeight=126;
+            w=Math.min(anchorWidth+8,width-8);menuHeight=102;
             left=Math.clamp(anchorX-4,4,Math.max(4,width-w-4));
             top=Math.clamp(anchorY-5,4,Math.max(4,height-menuHeight-4));
-            String[] names={"Client","Server","Enforce","Experimental","Debug"};
+            String[] names={"Client","Server","Enforce","Experimental"};
             var order=new ArrayList<Integer>();
             order.add(selected);
-            for(int section:new int[]{0,1,2,4})if(section!=selected)order.add(section);
+            for(int section:new int[]{0,1,2})if(section!=selected)order.add(section);
             if(selected!=3)order.add(3);
             for(int i=0;i<order.size();i++){
                 int section=order.get(i);

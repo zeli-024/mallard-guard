@@ -18,7 +18,6 @@ import net.minecraft.world.item.ItemStack;
 
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.slf4j.LoggerFactory;
@@ -29,6 +28,7 @@ public final class PunchyGuardCompat {
     private static boolean checked, available;
     private static Object handler, ownedClip;
     private static Object[][] clips = new Object[0][2];
+    private static Object[][] parriedClips = new Object[0][2];
     private static java.util.List<GuardPoseLibrary.Pose> library = java.util.List.of();
     private static long libraryGeneration = -1;
     private static final String[] poseKeys = new String[GuardPoseSettings.COUNT];
@@ -41,6 +41,13 @@ public final class PunchyGuardCompat {
     private static int[] preview;
     private static Object previewRight, previewLeft;
     private static boolean livePreview;
+    private static int[] previewParried;
+    private static int previewParriedHoldMs;
+    private static boolean previewSequence;
+    private static long previewGuardUntil;
+    private static boolean parriedActive,parriedPending;
+    private static long parriedGeneration;
+    private static long parriedHoldRemaining,parriedHoldClock;
     private static boolean previewMaintain=true,previewConsumed,spentGuard,automaticReturn,ownedMaintain=true;
     private static boolean lowerEmptyOffhand;
     private static net.minecraft.world.item.Item ownedItem, ownedSupportItem;
@@ -64,7 +71,7 @@ public final class PunchyGuardCompat {
     private static float transitionWeight;
     private static boolean transitionSnapshot, transitionReturning;
     private static boolean activeDefaultEligible, activeEmpty;
-    private static boolean reactionActive, reactionReturns;
+    private static boolean reactionActive;
     private static float reactionX, reactionY, reactionZ;
     private static float reactionPitch, reactionYaw, reactionRoll;
     private static final float REACTION_SNAP_WEIGHT=0.65F;
@@ -160,19 +167,26 @@ public final class PunchyGuardCompat {
     private static int guardPhase;
     private static boolean releasePending, releaseHadHitlag;
     private static long releaseAtNanos;
+    public static void correctGuardHand(){
+        if(preview!=null)return;
+        loweredOwner.clear();finishRelease();guardPhase=0;
+    }
     public static void guardStatus(int phase){
         boolean entry=phase>=1&&phase<=3&&(guardPhase<1||guardPhase>3);
         guardPhase=phase;
         if(phase<1||phase>3)spentGuard=false;
         if(preview==null && entry && initialize()){
             // A new guard owns the animation immediately, including during the old hit reaction/return.
-            finishRelease();spentGuard=false;restartPreview=true;
+            clearReaction();clearParried();interpolationPaused=false;
+            releasePending=releaseHadHitlag=exiting=automaticReturn=false;releaseAtNanos=0;
+            selected=-1;spentGuard=false;restartPreview=true;
             beforePoseTick(handler);
         }
         if(available&&preview==null&&ownedClip!=null&&(phase<1||phase>3))release();
     }
     public static boolean beforeIntentFlush(){
         if(!initialize())return false;
+        if(preview==null && GuardClient.attackBlocksGuard())return false;
         // Once guarding ends, a newer native attack may replace our reaction or return.
         if(preview==null&&(guardPhase<1||guardPhase>3||spentGuard))return false;
         if(ownedClip!=null&&!exiting&&!shouldTakeOver())release();
@@ -196,6 +210,7 @@ public final class PunchyGuardCompat {
     public static Float returnEasing(Object tickingHandler,float partialTick){
         if(tickingHandler!=handler || !exiting || ownedValues==null)return null;
         try{
+            if(currentClip.invoke(handler)!=ownedClip)return null;
             float linear=ownedValues[20]<=0?1.0F:Math.clamp(nativeReturnElapsed(partialTick)/(ownedValues[20]/1000.0F),0.0F,1.0F);
             return Math.clamp((float)GuardPoseSettings.ease(linear,ownedValues[21],ownedValues[22]),0.0F,1.0F);
         }catch(ReflectiveOperationException|LinkageError error){fail(error);return null;}
@@ -285,9 +300,12 @@ public final class PunchyGuardCompat {
     public static boolean shouldTakeOver(){
         LocalPlayer player=Minecraft.getInstance().player;
         if(player==null||!player.isAlive()||!initialize())return false;
+        if(preview==null && GuardClient.attackBlocksGuard())return false;
         if(preview==null&&player.isUsingItem()){
             if(GuardDiagnostics.enabled(GuardDiagnostics.PUNCHY_PRIORITY))priorityDiagnostic(player.getUsedItemHand()==InteractionHand.MAIN_HAND?"native main-hand item use":"native offhand item use");return false;
         }
+        if(parriedPending)return owner.get()==player&&stillOwnsClip()&&releaseAssignmentMatches(player)&&GuardConfig.PUNCHY_COMPAT.get();
+        if(parriedActive)return owner.get()==player && releaseAssignmentMatches(player) && (preview!=null || GuardConfig.PUNCHY_COMPAT.get()) && stillOwnsClip();
         if(reactionActive)return owner.get()==player && releaseAssignmentMatches(player) && (preview!=null || GuardConfig.PUNCHY_COMPAT.get());
         if(releasePending) return owner.get()==player && GuardConfig.PUNCHY_COMPAT.get() && releaseAssignmentMatches(player);
         if(exiting){try{return !player.isUsingItem()&&owner.get()==player&&releaseAssignmentMatches(player)&&(currentClip.invoke(handler)==ownedClip&&!returnFinished());}catch(ReflectiveOperationException|LinkageError error){fail(error);return false;}}
@@ -312,6 +330,8 @@ public final class PunchyGuardCompat {
     }
     public static void beforePoseTick(Object tickingHandler){
         if(!initialize()||tickingHandler!=handler)return;
+        if(parriedPending){if(!stillOwnsClip())clearParried();else return;}
+        if(parriedActive){advanceParried();return;}
         if(reactionActive&&!exiting){advanceReaction();return;}
         if(releasePending){
             if(preview==null && guardPhase>=1 && guardPhase<=3 && !spentGuard){releasePending=releaseHadHitlag=false;releaseAtNanos=0;}
@@ -327,6 +347,14 @@ public final class PunchyGuardCompat {
             release();
             return;
         }
+        if(previewSequence && ownedClip!=null && !restartPreview){
+            try{
+                if(transitionFinished()){
+                    if(previewGuardUntil==0)previewGuardUntil=System.nanoTime()+250_000_000L;
+                    if(System.nanoTime()>=previewGuardUntil){previewSequence=false;startParried(previewParried,previewParriedHoldMs,false);return;}
+                }
+            }catch(ReflectiveOperationException|LinkageError error){fail(error);return;}
+        }
         if(ownedClip!=null&&!ownedMaintain&&!restartPreview&&!(preview!=null&&livePreview)){
             try{if(currentClip.invoke(handler)==ownedClip&&transitionFinished()){if(preview!=null)previewConsumed=true;else spentGuard=true;release();automaticReturn=exiting;return;}}
             catch(ReflectiveOperationException|LinkageError error){fail(error);return;}
@@ -338,12 +366,12 @@ public final class PunchyGuardCompat {
             if(preview==null){if(selected<0||selected>=poses.length||poses[selected][0]==0||!matches(selected))selected=choose(player);if(selected<0){release();return;}assignment=library.get(selected);}
             InteractionHand other=hand==InteractionHand.MAIN_HAND?InteractionHand.OFF_HAND:InteractionHand.MAIN_HAND;
             ItemStack support=player.getItemInHand(other);
-            if(preview==null&&assignment!=null){otherHandVisible=(!assignment.otherHandHeldOnly||!otherHandEmpty)&&(assignment.otherHandItems.isEmpty()?otherHandVisible:!otherHandEmpty&&assignment.otherHandItems.contains(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(support.getItem()).toString()));}
+            if(preview==null&&assignment!=null){otherHandVisible=(!assignment.otherHandHeldOnly||!otherHandEmpty)&&(otherHandEmpty?otherHandVisible:assignment.supporting(support,otherHandVisible));}
             if (preview == null && !support.isEmpty() && support.getUseAnimation() != net.minecraft.world.item.UseAnim.NONE
-                && (assignment == null || !assignment.otherHandItems.contains(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(support.getItem()).toString()))) otherHandVisible = false;
-            weaponVisible=preview!=null||assignment==null||assignment.weaponItems.isEmpty()||assignment.weaponItems.contains(activeItem);
-            if(cachedWeaponVisible!=weaponVisible){for(Object[] pair:clips)Arrays.fill(pair,null);previewRight=previewLeft=null;cachedWeaponVisible=weaponVisible;}
-            if(cachedOtherHandVisible!=otherHandVisible){for(Object[] pair:clips)Arrays.fill(pair,null);previewRight=previewLeft=null;cachedOtherHandVisible=otherHandVisible;}
+                && (assignment == null || !assignment.supporting(support,false))) otherHandVisible = false;
+            weaponVisible=preview!=null||assignment==null||assignment.weapon(player.getItemInHand(hand));
+            if(cachedWeaponVisible!=weaponVisible){invalidateClips();cachedWeaponVisible=weaponVisible;}
+            if(cachedOtherHandVisible!=otherHandVisible){invalidateClips();cachedOtherHandVisible=otherHandVisible;}
             if(preview==null){
                 if(clips[selected][0]==null){clips[selected][0]=makeClip(poses[selected],selected,false);clips[selected][1]=makeClip(poses[selected],selected,true);}
             }else if(previewRight==null){previewRight=makeClip(preview,0,false);previewLeft=makeClip(preview,0,true);}
@@ -352,7 +380,6 @@ public final class PunchyGuardCompat {
                 int[] values=preview!=null?preview:poses[selected];
                 if(preview==null){
                     clearReaction();releasePending=releaseHadHitlag=exiting=automaticReturn=false;releaseAtNanos=0;
-                    clearClip.invoke(handler);
                 }
                 sourceHand.invoke(null,Minecraft.getInstance(),hand);activeArm.invoke(handler,arm);looping.invoke(handler,false);
                 // Start now, then blend for the configured entry time. Placement previews stay instant.
@@ -368,25 +395,32 @@ public final class PunchyGuardCompat {
         if(!changed)return;
         lockKey=locked;policyKey=GuardClient.enforcedAnimations();
         var entries=locked?(GuardClient.enforcedAnimations().isEmpty()?java.util.stream.IntStream.range(0,GuardPoseSettings.COUNT).mapToObj(GuardPoseLibrary::preset).toList():GuardClient.enforcedAnimations()):GuardPoseLibrary.snapshot();
-        library=java.util.List.copyOf(entries);poses=new int[library.size()][];clips=new Object[library.size()][2];
+        library=locked?entries.stream().map(GuardPoseLibrary.Pose::copy).toList():entries;poses=new int[library.size()][];clips=new Object[library.size()][2];parriedClips=new Object[library.size()][2];
         for(int i=0;i<library.size();i++){var pose=library.get(i);int preset=pose.preset?Integer.parseInt(pose.id.substring(6))-1:-1;if(preset>=0)poseKeys[preset]=GuardConfig.PUNCHY_POSES.get(preset).get();
             int[] configured=preset>=0&&locked&&GuardClient.enforcedAnimations().isEmpty()?GuardPoseSettings.parsePose(poseKeys[preset]):null;
-            if(configured!=null){pose.items.clear();pose.handMode=0;}
+            if(configured!=null){pose.items.clear();pose.handMode=0;pose.parriedValues=GuardPoseSettings.defaultParriedPose(configured);}
             poses[i]=configured==null?pose.values.clone():configured;poses[i][0]=configured==null?(pose.enabled?1:0):configured[0];
         }
         libraryGeneration=GuardPoseLibrary.generation();selected=last=previous=-1;
     }
+    private static int exclusiveOwner(ItemStack stack){for(int i=0;i<library.size();i++)if(library.get(i).exclusive(stack))return i;return -1;}
     private static int choose(LocalPlayer player){
-        int count=0;for(int i=0;i<poses.length;i++)if(poses[i][0]!=0&&matches(i))count++;
-        if(count==0)return -1;
-        int candidates=0;for(int i=0;i<poses.length;i++)if(candidate(i,count))candidates++;
+        var held=hand(player);if(held==null)return -1;var stack=player.getItemInHand(held);int owner=exclusiveOwner(stack),count=0;
+        boolean[] matching=new boolean[poses.length];
+        for(int i=0;i<poses.length;i++){matching[i]=poses[i][0]!=0&&(owner<0||owner==i)&&library.get(i).matches(stack,activeDefaultEligible);if(matching[i])count++;}
+        if(count==0)return -1;int candidates=0;
+        for(int i=0;i<poses.length;i++)if(matching[i]&&(count<2||i!=last)&&(count<3||i!=previous))candidates++;
         int roll=player.getRandom().nextInt(candidates);
-        for(int i=0;i<poses.length;i++)if(candidate(i,count)&&roll--==0){previous=last;last=i;return i;}
+        for(int i=0;i<poses.length;i++)if(matching[i]&&(count<2||i!=last)&&(count<3||i!=previous)&&roll--==0){previous=last;last=i;return i;}
         return -1;
     }
-    private static boolean candidate(int i,int count){return poses[i][0]!=0&&matches(i)&&(count<2||i!=last)&&(count<3||i!=previous);}
     private static boolean matches(int i){
-        return i>=0 && i<library.size() && library.get(i).matches(activeItem,activeEmpty,activeDefaultEligible);
+        return i>=0 && i<library.size() && presetMatches(i);
+    }
+    private static boolean presetMatches(int index){
+        var player=Minecraft.getInstance().player;if(player==null)return false;var selectedHand=hand(player);if(selectedHand==null)return false;var stack=player.getItemInHand(selectedHand);
+        int owner=exclusiveOwner(stack);if(owner>=0&&owner!=index)return false;
+        return library.get(index).matches(stack,activeDefaultEligible);
     }
     private static boolean releaseAssignmentMatches(LocalPlayer player){
         // An empty-hand-only clip must not linger on a weapon after a slot change.
@@ -395,9 +429,12 @@ public final class PunchyGuardCompat {
         InteractionHand support=ownedHand==InteractionHand.MAIN_HAND?InteractionHand.OFF_HAND:InteractionHand.MAIN_HAND;
         if(item.getItem()!=ownedItem || ownedOtherHandVisible && player.getItemInHand(support).getItem()!=ownedSupportItem)return false;
         boolean eligible=defaultAnimationEligible(item);
-        return library.get(selected).matches(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.getItem()).toString(),item.isEmpty(),eligible);
+        return library.get(selected).matches(item,eligible);
     }
     private static Object makeClip(int[] values, int index, boolean left) throws ReflectiveOperationException {
+        return makeClip(values,index,left,false);
+    }
+    private static Object makeClip(int[] values, int index, boolean left, boolean parried) throws ReflectiveOperationException {
         JsonObject animation = new JsonObject(), bones = new JsonObject(), timeline = new JsonObject();
         animation.addProperty("loop", "hold_on_last_frame");
         double duration = Math.max(0.05, values[19] / 1000.0);
@@ -407,7 +444,12 @@ public final class PunchyGuardCompat {
         if(otherHandVisible)bones.add(left ? "right_arm" : "left_arm", bone(values, 7, left));
         if(weaponVisible)bones.add(left ? "itemgrip_left" : "itemgrip_right", bone(values, 13, left));
         animation.add("bones", bones);
-        return buildClip.invoke(null, "mallardguard_pose_" + index + (left ? "_left" : "_right"), animation);
+        return buildClip.invoke(null, "mallardguard_" + (parried ? "parried_" : "pose_") + index + (left ? "_left" : "_right"), animation);
+    }
+    private static void invalidateClips(){
+        for(Object[] pair:clips)Arrays.fill(pair,null);
+        for(Object[] pair:parriedClips)Arrays.fill(pair,null);
+        previewRight=previewLeft=null;
     }
     private static JsonObject bone(int[] values, int offset, boolean mirrored) {
         JsonObject bone = new JsonObject(), position = new JsonObject(), rotation = new JsonObject();
@@ -445,20 +487,67 @@ public final class PunchyGuardCompat {
         if(animationLogging())GuardDiagnostics.event(GuardDiagnostics.PUNCHY_REACTION,"Punchy pose interpolation paused: partialTick="+partial);
     }
 
-    /** Reactions offset only the guarding arm; item-grip tracks remain untouched. */
-    public static void parrySucceeded(boolean freeze) { startReaction(true, freeze); }
+    /** A confirmed parry replaces the guard clip with its paired recoil pose. */
+    public static Runnable prepareParried(boolean freeze){
+        if(preview!=null||selected<0||selected>=library.size()||ownedClip==null){clearParried();return ()->{};}
+        long generation=++parriedGeneration;int selection=selected;var pose=library.get(selected);Object clip=ownedClip;
+        parriedPending=freeze;
+        return ()->{if(generation!=parriedGeneration||selection!=selected||clip!=ownedClip||!stillOwnsClip())return;if(Minecraft.getInstance().screen!=null){parriedPending=false;return;}parriedPending=false;startParried(pose.parriedValues,pose.parriedHoldMs,freeze);};
+    }
+    private static void startParried(int[] values,int holdMs,boolean freeze){
+        LocalPlayer player=owner.get();
+        if(!available || ownedClip==null || ownedHand==null || values==null){reactionSkipped("no paired guard pose");return;}
+        if(player==null || player!=Minecraft.getInstance().player || !player.isAlive() || player.isUsingItem()
+            || preview==null&&!GuardConfig.PUNCHY_COMPAT.get() || !releaseAssignmentMatches(player)){reactionSkipped("guard pose no longer applies");return;}
+        try{
+            if(currentClip.invoke(handler)!=ownedClip){reactionSkipped("a newer animation owns the hands");return;}
+            HumanoidArm arm=ownedHand==InteractionHand.MAIN_HAND?player.getMainArm():player.getMainArm().getOpposite();
+            int side=arm==HumanoidArm.RIGHT?0:1;
+            Object clip;
+            if(preview!=null)clip=makeClip(values,0,side==1,true);
+            else{
+                if(parriedClips[selected][side]==null)parriedClips[selected][side]=makeClip(values,selected,side==1,true);
+                clip=parriedClips[selected][side];
+            }
+            clearReaction();interpolationPaused=false;
+            releasePending=exiting=automaticReturn=false;releaseAtNanos=0;
+            releaseHadHitlag=freeze;parriedActive=true;spentGuard=preview==null;previewConsumed=false;
+            parriedHoldRemaining=holdMs*1_000_000L;parriedHoldClock=0;
+            playTransition(clip,values,values[19]/1000.0F,arm,ownedOtherHandVisible);
+            ownedClip=clip;
+            if(animationLogging())GuardDiagnostics.event(GuardDiagnostics.PUNCHY_REACTION,"Punchy parried pose started: hand="+ownedHand+", impactMs="+values[19]+", holdMs="+holdMs+", returnMs="+values[20]+", hitlag="+freeze);
+        }catch(ReflectiveOperationException|RuntimeException|LinkageError error){fail(error);}
+    }
+    private static void advanceParried(){
+        LocalPlayer player=owner.get();
+        if(player==null || player!=Minecraft.getInstance().player || !player.isAlive() || player.isUsingItem()
+            || preview==null&&!GuardConfig.PUNCHY_COMPAT.get() || !releaseAssignmentMatches(player)){finishRelease();return;}
+        try{
+            if(currentClip.invoke(handler)!=ownedClip){finishRelease();return;}
+            if(exiting){advanceReturn();return;}
+            if(preview==null && GuardHitlag.freezeActive()){parriedHoldClock=0;return;}
+            if(!transitionFinished()){parriedHoldClock=0;return;}
+            long now=System.nanoTime();
+            if(parriedHoldClock!=0)parriedHoldRemaining=Math.max(0,parriedHoldRemaining-Math.max(0,now-parriedHoldClock));
+            parriedHoldClock=now;
+            if(parriedHoldRemaining>0)return;
+            if(preview!=null)previewConsumed=true;
+            releasePending=true;
+            advanceRelease();
+        }catch(ReflectiveOperationException|RuntimeException|LinkageError error){fail(error);}
+    }
     public static void blockHit() {
         LocalPlayer player=owner.get();
         if(player!=null && ownedHand!=null && GuardClient.shieldLike(player.getItemInHand(ownedHand))){
             reactionSkipped("shield blocking uses its native reaction");return;
         }
-        startReaction(false,false);
+        startBlockReaction();
     }
     private static boolean animationLogging(){return GuardDiagnostics.enabled(GuardDiagnostics.PUNCHY_REACTION);}
     private static void reactionSkipped(String reason){
         if(animationLogging())GuardDiagnostics.event(GuardDiagnostics.PUNCHY_REACTION,"Punchy reaction skipped: "+reason);
     }
-    private static void startReaction(boolean returns, boolean freeze) {
+    private static void startBlockReaction() {
         LocalPlayer player=owner.get();
         if(!available || ownedClip==null || ownedValues==null || ownedHand==null){reactionSkipped("no active guard pose");return;}
         if(player==null || player!=Minecraft.getInstance().player || !player.isAlive()){reactionSkipped("no active player");return;}
@@ -480,15 +569,13 @@ public final class PunchyGuardCompat {
             reactionYaw=(player.getRandom().nextFloat()-0.5F)*8.0F;
             reactionRoll=-reactionX*10.0F+(player.getRandom().nextFloat()-0.5F)*4.0F;
             pauseInterpolation();
-            reactionActive=true;reactionReturns=returns;
+            reactionActive=true;
             reactionElapsed=0;
             reactionClock=System.nanoTime();
             releasePending=false;releaseAtNanos=0;
-            releaseHadHitlag=freeze;
-            reactionFreezeObserved=freeze;
-            // A parry ends this visual stance even if its status packet arrives later.
-            if(returns)spentGuard=true;
-            if(animationLogging())GuardDiagnostics.event(GuardDiagnostics.PUNCHY_REACTION,"Punchy reaction started: type="+(returns?"parry":"block")+", hand="+ownedHand+", offset="+reactionX+","+reactionY+","+reactionZ+", angleDegrees="+reactionPitch+","+reactionYaw+","+reactionRoll+", emptyHand="+player.getItemInHand(ownedHand).isEmpty()+", snapWeight="+REACTION_SNAP_WEIGHT+", hitlag="+freeze);
+            releaseHadHitlag=false;
+            reactionFreezeObserved=false;
+            if(animationLogging())GuardDiagnostics.event(GuardDiagnostics.PUNCHY_REACTION,"Punchy block reaction started: hand="+ownedHand+", offset="+reactionX+","+reactionY+","+reactionZ+", angleDegrees="+reactionPitch+","+reactionYaw+","+reactionRoll+", emptyHand="+player.getItemInHand(ownedHand).isEmpty()+", snapWeight="+REACTION_SNAP_WEIGHT);
         }catch(ReflectiveOperationException | RuntimeException | LinkageError error){fail(error);}
     }
     private static void advanceReaction() {
@@ -509,12 +596,7 @@ public final class PunchyGuardCompat {
                 reactionHoldLogged=true;
                 if(animationLogging())GuardDiagnostics.event(GuardDiagnostics.PUNCHY_REACTION,"Punchy reaction hold started: hand="+ownedHand+", holdMs="+REACTION_HOLD_NANOS/1_000_000L);
             }
-            if(reactionReturns){
-                if(reactionElapsed<REACTION_RISE_NANOS+REACTION_HOLD_NANOS)return;
-                reactionElapsed=REACTION_RISE_NANOS+REACTION_HOLD_NANOS;
-                releasePending=true;
-                advanceRelease();
-            }else if(reactionElapsed>=REACTION_RISE_NANOS+REACTION_HOLD_NANOS+BLOCK_RECOVERY_NANOS){
+            if(reactionElapsed>=REACTION_RISE_NANOS+REACTION_HOLD_NANOS+BLOCK_RECOVERY_NANOS){
                 clearReaction();
             }
         }catch(ReflectiveOperationException | RuntimeException | LinkageError error){fail(error);}
@@ -523,7 +605,6 @@ public final class PunchyGuardCompat {
         if(!reactionActive)return 0;
         long elapsed=reactionElapsed;
         if(!exiting && !releasePending && !GuardHitlag.freezeActive())elapsed+=Math.max(0,System.nanoTime()-reactionClock);
-        if(reactionReturns)elapsed=Math.min(elapsed,REACTION_RISE_NANOS);
         if(elapsed<=REACTION_RISE_NANOS){
             float t=Math.clamp((float)elapsed/REACTION_RISE_NANOS,0.0F,1.0F);
             float remaining=1.0F-t;
@@ -536,32 +617,31 @@ public final class PunchyGuardCompat {
     }
     private static void clearReaction(){
         if(reactionActive && animationLogging())GuardDiagnostics.event(GuardDiagnostics.PUNCHY_REACTION,"Punchy reaction ended: hand="+ownedHand+", rendered="+reactionRendered+", peakWeight="+reactionPeak+", released="+exiting);
-        reactionActive=reactionReturns=false;reactionElapsed=reactionClock=0;interpolationPaused=false;
+        reactionActive=false;reactionElapsed=reactionClock=0;interpolationPaused=false;
         reactionRendered=reactionMissingArmLogged=reactionFreezeObserved=reactionFreezeLogged=reactionHoldLogged=false;reactionPeak=0.0F;
     }
-    private static void interruptReaction(){clearReaction();}
 
     public static void previewPose(int[] values,boolean maintain) {
-        interruptReaction();
+        clearReaction();clearParried();previewSequence=false;previewParried=null;previewGuardUntil=0;
         releasePending=releaseHadHitlag=false;releaseAtNanos=0;previewMaintain=maintain;previewConsumed=false;automaticReturn=false;livePreview=false;preview=values.clone();previewRight=previewLeft=null;restartPreview=true;
     }
-    public static void previewMaintain(boolean maintain){previewMaintain=maintain;if(preview!=null){previewConsumed=false;ownedMaintain=livePreview||maintain;}}
-    public static void previewMotion(int[] values){
-        if(preview==null)return;
-        // Keep entry, release and easing together without restarting a held preview.
-        System.arraycopy(values,19,preview,19,4);
-        if(ownedValues!=null&&!exiting)System.arraycopy(values,19,ownedValues,19,4);
+    public static void previewSequence(GuardPoseLibrary.Pose pose){
+        previewPose(pose.values,true);
+        previewParried=pose.parriedValues.clone();
+        previewParriedHoldMs=pose.parriedHoldMs;
+        previewSequence=true;
     }
+    public static void previewMaintain(boolean maintain){previewMaintain=maintain;if(preview!=null){previewConsumed=false;ownedMaintain=livePreview||maintain;}}
     public static void livePreviewPose(int[] values) {
-        interruptReaction();
+        clearReaction();clearParried();previewSequence=false;previewParried=null;previewGuardUntil=0;
         releasePending=releaseHadHitlag=false;releaseAtNanos=0;int[] held=values.clone();held[19]=0;
         if(preview!=null && java.util.Arrays.equals(preview,held))return;
         previewConsumed=false;automaticReturn=false;livePreview=true;preview=held;previewRight=previewLeft=null;
     }
     private static final int[][] NO_POSES=new int[0][];
     private static final Object[][] NO_CLIPS=new Object[0][2];
-    public static void clearSession(){loweredOwner.clear();finishRelease();clearPreview();guardPhase=0;spentGuard=startingTransition=false;library=java.util.List.of();poses=NO_POSES;clips=NO_CLIPS;libraryGeneration=-1;policyKey=null;last=previous=-1;}
-    public static void clearPreview(){interruptReaction();release();preview=null;previewRight=previewLeft=null;restartPreview=livePreview=false;previewConsumed=false;}
+    public static void clearSession(){loweredOwner.clear();finishRelease();clearPreview();guardPhase=0;spentGuard=startingTransition=false;library=java.util.List.of();poses=NO_POSES;clips=parriedClips=NO_CLIPS;libraryGeneration=-1;policyKey=null;last=previous=-1;}
+    public static void clearPreview(){if(preview!=null)finishRelease();preview=null;previewParried=null;previewParriedHoldMs=0;previewSequence=false;previewGuardUntil=0;previewRight=previewLeft=null;restartPreview=livePreview=false;previewConsumed=false;}
     public static void parryHitlagStarted(){if(ownedClip!=null&&!exiting){releaseHadHitlag=true;releaseAtNanos=0;}}
     public static boolean ownsHandVisibility(Object tickingHandler){return tickingHandler==handler&&ownsHandVisibility();}
     public static boolean ownsHandVisibility(){
@@ -569,8 +649,12 @@ public final class PunchyGuardCompat {
         if(!available||ownedClip==null||player==null||!player.isAlive()||owner.get()!=player||player.isUsingItem()||!(ownedOtherHandVisible || ownedHand==InteractionHand.OFF_HAND && player.getOffhandItem().isEmpty()))return false;
         try{return currentClip.invoke(handler)==ownedClip;}catch(ReflectiveOperationException|LinkageError error){fail(error);return false;}
     }
+    private static boolean stillOwnsClip(){
+        try{return currentClip.invoke(handler)==ownedClip;}
+        catch(ReflectiveOperationException|LinkageError error){fail(error);return false;}
+    }
     private static void release(){
-        if(reactionActive||exiting||releasePending)return;
+        if(parriedPending||parriedActive||reactionActive||exiting||releasePending)return;
         LocalPlayer player=owner.get();
         if(ownedClip!=null && player!=null && player.isAlive() && !player.isUsingItem() && releaseAssignmentMatches(player)){
             releasePending=true;releaseAtNanos=0;
@@ -738,8 +822,12 @@ public final class PunchyGuardCompat {
     private static java.util.Map<String,Object> nativeSamples(java.lang.reflect.Field field) throws IllegalAccessException {
         return (java.util.Map<String,Object>)field.get(handler);
     }
+    private static void clearParried(){
+        parriedGeneration++;parriedPending=parriedActive=false;parriedHoldRemaining=parriedHoldClock=0;
+    }
     private static void clearOwnedState(){
         clearReaction();
+        clearParried();
         lastOwnedPartialTick=1.0F;
         releasePending=releaseHadHitlag=false;
         releaseAtNanos=0;
@@ -771,13 +859,14 @@ public final class PunchyGuardCompat {
     }
     @SubscribeEvent public static void endTick(ClientTickEvent.Post event) {
         if (Minecraft.getInstance().player == null || !Minecraft.getInstance().player.isAlive()) { clearSession(); }
+        else if(parriedActive) advanceParried();
         else if(reactionActive&&!exiting) advanceReaction();
         else if(releasePending) advanceRelease();
         else if(available&&ownedClip!=null){if(exiting)advanceReturn();else if(!shouldTakeOver())release();}
     }
     public static void resourcesReloaded() {
         loweredOwner.clear();finishRelease();clearPreview(); libraryGeneration = -1;
-        for (Object[] pair : clips) Arrays.fill(pair, null);
+        invalidateClips();
     }
     private static void fail(Throwable exception) {
         loweredOwner.clear();

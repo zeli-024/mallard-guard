@@ -6,6 +6,7 @@ import dev.zeli.mallardguard.GuardControlSettings;
 import dev.zeli.mallardguard.GuardControlSettings.Control;
 import dev.zeli.mallardguard.GuardParticleConfig;
 import dev.zeli.mallardguard.GuardParticleColors;
+import dev.zeli.mallardguard.GuardScreenSettings;
 import dev.zeli.mallardguard.GuardSparkTracerConfig;
 
 import dev.zeli.mallardguard.GuardConfig;
@@ -38,16 +39,15 @@ import java.util.function.BooleanSupplier;
 public final class GuardConfigScreen extends Screen {
     private final boolean operator;
     private final Screen parent;
-    private static int rememberedClientPage = 7, rememberedServerPage, rememberedSection, rememberedEnforcePage = 8, rememberedDebugPage = 6;
+    private static int rememberedClientPage = 7, rememberedServerPage, rememberedSection, rememberedEnforcePage = 8;
     private static int rememberedClientRow, rememberedServerRow, rememberedEnforceRow, rememberedExperimentalRow, rememberedExperimentalPage = 12;
     private static final Map<String, String> rememberedGroups = new HashMap<>();
-    int page, enforcePage=rememberedEnforcePage, debugPage=rememberedDebugPage;
+    int page, enforcePage=rememberedEnforcePage;
     private int clientPage = rememberedClientPage, serverPage = rememberedServerPage, clientRow = rememberedClientRow, serverRow = rememberedServerRow, enforceRow = rememberedEnforceRow, experimentalRow = rememberedExperimentalRow, experimentalPage = rememberedExperimentalPage;
     private int sidebarOffset;
-    boolean debugSection = rememberedSection == 4;
     boolean experimentalSection = rememberedSection == 3;
     boolean clientSection = rememberedSection == 0;
-    boolean enforceSection = rememberedSection == 2, enforceParticlesOpen, enforceHudOpen, enforceAudioOpen, enforcePunchyOpen;
+    boolean enforceSection = rememberedSection == 2, enforceHudOpen, enforceAudioOpen, enforcePunchyOpen;
 
     private int activeClientCategory;
     int layoutTop, panelLeft, panelWidth, firstRow, visibleRows, sidebarLeft, sidebarWidth, controlIndex;
@@ -57,7 +57,6 @@ public final class GuardConfigScreen extends Screen {
     private boolean dirtyClient, dirtyServer, dirtyServerRules, dirtyPolicy;
     private boolean dirtyDamageRules;
     boolean dirtyShield, dirtyMobs;
-    boolean chromaticOpen;
 
     boolean mobEligibilityOpen, mobColorsOpen, mobEquipmentOpen;
 
@@ -155,10 +154,10 @@ public final class GuardConfigScreen extends Screen {
         configDraft.debugFlags=0;dirtyClient=dirty=true;
         for(int category:CLIENT_PAGES)if(!GuardClient.clientCategoryLocked(categoryMask(category)))resetClientPage(category);
         if(!GuardClient.clientCategoryLocked(GuardClientPreset.PUNCHY))resetClientPage(14);
+        if(!GuardClient.clientCategoryLocked(GuardClientPreset.SCREEN))resetClientPage(24);
         if(operator){
             var defaults=GuardConfig.defaultSnapshot(true);
             for(int category:SERVER_PAGES)resetServerPage(category,defaults);
-            resetServerPage(6,defaults);
             for(int category:EXPERIMENTAL_PAGES)resetServerPage(category,defaults);
             configDraft.enforceEnabled=false;configDraft.dontEnforceMask=0;configDraft.enforcedPoseData="";
             System.arraycopy(GuardClientPreset.DEFAULTS,0,configDraft.enforcedDefaults,0,configDraft.enforcedDefaults.length);
@@ -176,20 +175,26 @@ public final class GuardConfigScreen extends Screen {
     private boolean settingsSearchChanged;
     private final Map<String, Integer> visibleSettingRows = new HashMap<>();
     private final Map<String, String> sourceMods = new HashMap<>();
-    boolean sparkTracersOpen, dotStreaksOpen, animatedOpen, shieldOpen, screenFlashOpen, cameraFeedbackOpen, animationOpen;
+    boolean sparkTracersOpen, dotStreaksOpen, animatedOpen, shieldOpen, animationOpen;
     boolean healingOpen, centerImpactOpen;
 
-    boolean timingOpen, retaliationOpen, pushbackOpen, parryProjectileOpen, parryExplosionOpen;
+    boolean timingOpen, pushbackOpen;
     boolean guardOpen, blockProjectileOpen, blockExplosionOpen;
     boolean eligibilityOpen, priorityOpen, durabilityOpen;
     boolean shieldTimingOpen, shieldPerfectOpen, shieldIdsOpen;
     private String reactionGroup="Parry";
-    boolean commonDamageOpen, fallOpen, diagnosticOpen;
+    boolean commonDamageOpen, fallOpen;
+    private String diagnosticGroup="Combat";
     private int totalRows;
 
     private final Map<Integer, String> changedRows = new HashMap<>();
     private final Map<Integer, String> originalRows = new HashMap<>();
     private final Map<Integer,Runnable> rowRestores=new HashMap<>();
+    private final Map<Integer,Boolean> rowEnabled=new HashMap<>();
+    // A page master owns nested dividers; each sibling feature starts from that parent.
+    private boolean pageControlsEnabled=true,featureControlsEnabled=true;
+    void pageControls(boolean enabled){pageControlsEnabled=featureControlsEnabled=enabled;}
+    void controls(boolean enabled){featureControlsEnabled=pageControlsEnabled&&enabled;}
     private final Map<Integer,Button> rowUndoButtons=new HashMap<>();
     private record RowControl(AbstractWidget widget, int x, int width, boolean header) {}
     private final Map<Integer,RowControl> rowControls=new HashMap<>();
@@ -202,30 +207,31 @@ public final class GuardConfigScreen extends Screen {
     private final Map<AbstractWidget, String> widgetTips = new HashMap<>();
     private static final int WARM_EDGE = GuardUi.WARM;
     private static final int TEXT = GuardUi.TEXT;
+    String feedbackGroup="Hitlag";
+    boolean whenParriedOpen;
+    private static final String[] FEEDBACK_GROUPS={"Hitlag","Impact Frame","White Flash","Camera Shake","Chromatic Aberration"};
     private static final int ROW_STEP = 25;
     private final List<SettingLabel> settingLabels = new ArrayList<>();
-    private static final String[] SERVER_TABS = {"Parrying", "Eligibility", "Blocking", "Shields", "Multiplayer"};
-    private static final int[] SERVER_PAGES = {0, 4, 1, 11, 2};
+    private static final String[] SERVER_TABS = {"Parrying","Blocking","Eligibility","Shields","Damage Sources","Multiplayer","Diagnostics"};
+    private static final int[] SERVER_PAGES = {0,1,4,11,6,2,18};
     private static final String[] CLIENT_TABS = {"World Particles", "Screen Effects", "HUD Icons", "Audio Sliders", "Animations"};
     private static final int[] CLIENT_PAGES = {7, 2, 17, 3, 15};
-    private static final int[] EXPERIMENTAL_PAGES = {12, 14};
-    private static final String[] EXPERIMENTAL_TABS = {"Mob Guard", "Punchy"};
-    private static final int[] ENFORCE_PAGES={8,19,20,21,22,23};
-    private static final String[] ENFORCE_TABS={"World Particles","Screen Effects","HUD Icons","Audio Sliders","Animations","Punchy"};
-    private static final int[] DEBUG_PAGES={6,18};
-    private static final String[] DEBUG_TABS={"Damage Sources","Diagnostics"};
+    private static final int[] EXPERIMENTAL_PAGES = {12, 14, 24};
+    private static final String[] EXPERIMENTAL_TABS = {"Mob Guard", "Punchy", "Target Highlight"};
+    private static final int[] ENFORCE_PAGES={8,19,20,21,22,23,25};
+    private static final String[] ENFORCE_TABS={"World Particles","Screen Effects","HUD Icons","Audio Sliders","Animations","Punchy","Target Highlight"};
     private final java.util.Set<Button> redButtons = new java.util.HashSet<>();
 
     public GuardConfigScreen(GuardPackets.Settings settings, Screen parent) {
         super(Component.literal("Mallard Guard"));
         this.parent = parent;
-        this.page = debugSection ? debugPage : experimentalSection ? experimentalPage : enforceSection ? enforcePage : clientSection ? clientPage : serverPage;
+        this.page = experimentalSection ? experimentalPage : enforceSection ? enforcePage : clientSection ? clientPage : serverPage;
         this.firstRow = experimentalSection ? experimentalRow : enforceSection ? enforceRow : clientSection ? clientRow : serverRow;
         operator = settings.operator();
         GuardPackets.ClientPolicy policy = GuardClient.currentPolicy();
         configDraft.enforcedPoseData=policy.animations();
         configDraft.enforceEnabled = policy.enabled();
-        enforceParticlesOpen = enforceHudOpen = enforceAudioOpen = false;
+        enforceHudOpen = enforceAudioOpen = false;
         configDraft.dontEnforceMask = policy.dontEnforceMask();
         int[] received = GuardClientPreset.parse(policy.defaults());
         configDraft.enforcedDefaults = received == null ? GuardClientPreset.DEFAULTS.clone() : received;
@@ -241,7 +247,7 @@ public final class GuardConfigScreen extends Screen {
         configDraft.hud = GuardConfig.HUD.get();
         configDraft.shieldEffects = GuardConfig.SHIELD_EFFECTS.get();
         configDraft.memeFlash = GuardConfig.MEME_FLASH.get();
-        configDraft.hitlagFrames = GuardConfig.HITLAG_FRAMES.get();
+        configDraft.hitlagTicks = GuardConfig.HITLAG_TICKS.get();
         configDraft.impactFrames = GuardConfig.IMPACT_FRAMES.get();
         configDraft.impactPerfectOnly = GuardConfig.IMPACT_PERFECT_ONLY.get();
         configDraft.impactBrightness = GuardConfig.IMPACT_BRIGHTNESS.get(); configDraft.impactContrast = GuardConfig.IMPACT_CONTRAST.get();
@@ -249,10 +255,10 @@ public final class GuardConfigScreen extends Screen {
         configDraft.hitParticles = settings.hitParticles();
         configDraft.masterVolume = GuardConfig.LOCAL_MASTER_VOLUME.get(); configDraft.perfectVolume = GuardConfig.LOCAL_PERFECT_VOLUME.get();
         configDraft.parryVolume = GuardConfig.LOCAL_PARRY_VOLUME.get(); configDraft.blockVolume = GuardConfig.LOCAL_BLOCK_VOLUME.get();
-        configDraft.flashStrength = GuardConfig.SCREEN_FLASH.get() ? GuardConfig.FLASH_STRENGTH.get() : 0;
+        configDraft.flashStrength=GuardConfig.FLASH_STRENGTH.get();
         configDraft.perfectOnlyFlash = GuardConfig.PERFECT_ONLY_FLASH.get();
-        configDraft.shakeStrength = GuardConfig.SCREEN_SHAKE.get() ? GuardConfig.SHAKE_STRENGTH.get() : 0;
-        configDraft.fallParry = settings.fallParry(); configDraft.fallPerfectParry = settings.fallPerfectParry(); configDraft.fallLookDown = settings.fallLookDown(); configDraft.fallBreakBlocks = settings.fallBreakBlocks();
+        configDraft.shakeStrength=GuardConfig.SHAKE_STRENGTH.get();
+        configDraft.fallParry = settings.fallParry(); configDraft.fallBreakBlocks = settings.fallBreakBlocks();
         configDraft.fallBlastStrength = settings.fallBlastStrength(); configDraft.fallLaunchPower = settings.fallLaunchPower();
         configDraft.parryExplosions = settings.parryExplosions(); configDraft.perfectExplosionsOnly = settings.perfectExplosionsOnly();
         configDraft.blockExplosions = settings.blockExplosions(); configDraft.parryProjectiles = settings.parryProjectiles();
@@ -277,6 +283,7 @@ public final class GuardConfigScreen extends Screen {
     }
 
     private void setShieldSettings(GuardPackets.ShieldSettings settings) {
+        configDraft.retaliationEnabled=settings.retaliationEnabled();configDraft.perfectProjectilesOnly=settings.perfectProjectilesOnly();configDraft.perfectFallOnly=settings.perfectFallOnly();configDraft.perfectKnockbackMultiplier=settings.perfectKnockbackMultiplier();configDraft.incomingReaction=settings.incomingReaction();configDraft.parriedEnabled=settings.parriedEnabled();configDraft.parriedGuardBreakTicks=settings.parriedGuardBreakTicks();configDraft.parriedStunTicks=settings.parriedStunTicks();configDraft.shieldConeEnabled=settings.coneEnabled();
         configDraft.shieldPerfect = settings.perfect(); configDraft.shieldWindow = settings.window(); configDraft.shieldRechargeTicks = settings.rechargeTicks(); configDraft.shieldMaxBlocks = settings.maxBlocks(); configDraft.toolMaxBlocks = settings.toolMaxBlocks();
         configDraft.shieldBreakTicks = settings.breakTicks(); configDraft.shieldCone = settings.cone(); configDraft.shieldReach = settings.reach(); configDraft.shieldReturn = settings.retaliation();
         configDraft.cooldownPreventsGuard = settings.cooldownPreventsGuard(); configDraft.allowEmptyHand = settings.allowEmptyHand();
@@ -300,15 +307,13 @@ public final class GuardConfigScreen extends Screen {
         if (!dirtyShield) { SavedState before=captureState();setShieldSettings(settings); configDraft.consumablePriority = settings.consumablePriority();acceptReceivedValues(before);rebuildWidgets(); }
     }
 
-    <T extends AbstractWidget> T addControl(T widget) { return addRenderableWidget(widget); }
-    void refreshControls() { rebuildWidgets(); }
 
     @Override protected void init() {
         controlBindings.clear();
         if(appliedState==null)appliedState=captureState();
         controlIndex = 0;
         settingsSearchBox = null;
-        visibleSettingRows.clear(); rowValues.clear(); changedRows.clear(); originalRows.clear();rowRestores.clear();rowUndoButtons.clear();rowControls.clear();
+        visibleSettingRows.clear(); rowValues.clear(); changedRows.clear(); originalRows.clear();rowRestores.clear();rowUndoButtons.clear();rowControls.clear();rowEnabled.clear();pageControls(true);
         themedButtons.clear(); redButtons.clear();colorPreviews.clear();
         buttonTips.clear();
         widgetTips.clear();
@@ -322,7 +327,7 @@ public final class GuardConfigScreen extends Screen {
         visibleRows = Math.max(1, (height - rowTop() - 5) / ROW_STEP);
         activeClientCategory = switch (page) {
             case 7, 8 -> GuardClientPreset.PARTICLES;
-            case 2,9,10->GuardClientPreset.SCREEN;
+            case 2,9,10,24,25->GuardClientPreset.SCREEN;
             case 15->GuardClientPreset.ANIMATIONS;
             case 17->GuardClientPreset.HUD;
             case 14 -> GuardClientPreset.PUNCHY;
@@ -333,14 +338,14 @@ public final class GuardConfigScreen extends Screen {
         boolean compact = height < 260;
         int modeHeight = compact ? 18 : 22;
         int modeTop = layoutTop + 34;
-        int currentSection = debugSection ? 4 : experimentalSection ? 3 : enforceSection ? 2 : clientSection ? 0 : 1;
+        int currentSection = experimentalSection ? 3 : enforceSection ? 2 : clientSection ? 0 : 1;
         int sectionArrowWidth=GuardUiLayout.SECTION_ARROW_WIDTH, modeGap=GuardUiLayout.CONTROL_GAP;
-        Button previous=addRenderableWidget(GuardUi.builder(Component.literal("<"),b->selectSection((currentSection+4)%5))
+        Button previous=addRenderableWidget(GuardUi.builder(Component.literal("<"),b->selectSection((currentSection+3)%4))
             .bounds(sidebarLeft,modeTop,sectionArrowWidth,modeHeight).build());
-        Button mode=addRenderableWidget(GuardUi.builder(Component.literal(new String[]{"Client","Server","Enforce","Experimental","Debug"}[currentSection]+" ▾"),
+        Button mode=addRenderableWidget(GuardUi.builder(Component.literal(new String[]{"Client","Server","Enforce","Experimental"}[currentSection]+" ▾"),
             b->GuardUi.sections(this,currentSection,this::selectSection,b.getX(),b.getY(),b.getWidth(),b.getHeight()))
             .bounds(sidebarLeft+sectionArrowWidth+modeGap,modeTop,sidebarWidth-2*(sectionArrowWidth+modeGap),modeHeight).build());
-        Button next=addRenderableWidget(GuardUi.builder(Component.literal(">"),b->selectSection((currentSection+1)%5))
+        Button next=addRenderableWidget(GuardUi.builder(Component.literal(">"),b->selectSection((currentSection+1)%4))
             .bounds(sidebarLeft+sidebarWidth-sectionArrowWidth,modeTop,sectionArrowWidth,modeHeight).build());
         if(experimentalSection)redButtons.add(mode);
         tip(previous,"Previous config section.");tip(next,"Next config section.");
@@ -353,10 +358,11 @@ public final class GuardConfigScreen extends Screen {
         search.setResponder(value -> { settingsSearch = value; settingsSearchChanged = true; });
         tip(search, "Search all settings by name or category. Choose a result to open its page and scroll to it. Clear to return to your current page.");
         GuardConfigPages.build(this);
+        pageControls(true);
 
         {
-            String[] tabs = debugSection ? DEBUG_TABS : enforceSection ? ENFORCE_TABS : clientSection ? CLIENT_TABS : experimentalSection ? EXPERIMENTAL_TABS : SERVER_TABS;
-            int[] pages = debugSection ? DEBUG_PAGES : enforceSection ? ENFORCE_PAGES : clientSection ? CLIENT_PAGES : experimentalSection ? EXPERIMENTAL_PAGES : SERVER_PAGES;
+            String[] tabs = enforceSection ? ENFORCE_TABS : clientSection ? CLIENT_TABS : experimentalSection ? EXPERIMENTAL_TABS : SERVER_TABS;
+            int[] pages = enforceSection ? ENFORCE_PAGES : clientSection ? CLIENT_PAGES : experimentalSection ? EXPERIMENTAL_PAGES : SERVER_PAGES;
             int shown = tabs.length;
             sidebarOffset = 0;
             for (int i = sidebarOffset; i < Math.min(tabs.length, sidebarOffset + shown); i++) {
@@ -395,7 +401,7 @@ public final class GuardConfigScreen extends Screen {
         tip(help,"Help with navigation, editing and saving.");
         int actionWidth=(sidebarWidth-22)/2, actionHeight=height<220?16:20, actionTop=height-(height<220?43:56), actionBottom=height-(height<220?23:32);
         Button reset=addRenderableWidget(GuardUi.button("Reset",sidebarLeft+8,actionTop,sidebarWidth-16,actionHeight,()->confirmReset(true)));
-        reset.active=!(experimentalSection&&page==14&&!PunchyGuardCompat.installed())&&(clientSection||debugSection&&(page==18||operator)||experimentalSection&&!GuardClient.clientCategoryLocked(GuardClientPreset.PUNCHY)||operator);tip(reset,"Reset this page or all editable settings to defaults.");redButtons.add(reset);
+        reset.active=!(experimentalSection&&page==14&&!PunchyGuardCompat.installed())&&(clientSection||page==18||experimentalSection&&page!=12&&!GuardClient.clientCategoryLocked(categoryMask(page))||operator);tip(reset,"Reset this page or all editable settings to defaults.");redButtons.add(reset);
         Button apply=addRenderableWidget(GuardUi.button("Apply",sidebarLeft+8,actionBottom,actionWidth,actionHeight,this::applyPrompt));tip(apply,"Save settings, then choose Stay or Close.");
         Button close=addRenderableWidget(GuardUi.button("Close",sidebarLeft+14+actionWidth,actionBottom,actionWidth,actionHeight,this::onClose));tip(close,"Close settings. Unsaved changes require confirmation.");
         if(appliedState!=null){SavedState current=captureState();for(var entry:appliedState.fields().entrySet())restoreField(entry.getKey(),entry.getValue());
@@ -410,7 +416,7 @@ public final class GuardConfigScreen extends Screen {
             }
             int undoX=contentRight()-GuardUiLayout.UNDO_SIZE-(header?GuardUiLayout.ARROW_SLOT+GuardUiLayout.CONTROL_GAP:0);
             Button undo=addRenderableWidget(GuardUi.iconButton("undo","Undo",undoX,row(position),GuardUiLayout.UNDO_SIZE,entry.getValue()));
-            undo.visible=rowChanged(position);undo.active=undo.visible;
+            undo.visible=rowChanged(position);undo.active=undo.visible&&rowEnabled.getOrDefault(position,false);
             rowUndoButtons.put(position,undo);tip(undo,"Restore this setting to its last saved value.");
         }
         updateRowLayouts();
@@ -420,16 +426,48 @@ public final class GuardConfigScreen extends Screen {
 
     }
 
+    void buildIconPosition(boolean enforced){
+        int[] values=enforced?configDraft.enforcedDefaults:configDraft.extraClient;
+        controls(enforced?values[0]!=0:configDraft.hud);
+        int position=controlIndex++;
+        trackValue(position,()->java.util.Arrays.stream(GuardIconPositionScreen.SLOTS).mapToObj(i->Integer.toString(values[i])).collect(java.util.stream.Collectors.joining(",")));
+        rowUndo(position,enforced,()->{String[] previous=originalRows.get(position).split(",");for(int n=0;n<GuardIconPositionScreen.SLOTS.length;n++)values[GuardIconPositionScreen.SLOTS[n]]=Integer.parseInt(previous[n]);});
+        if(!visible(position))return;
+        String description="Drag the shield or choose a screen/hotbar anchor. Boss bars and shared HUD spacing are respected.";
+        settingLabel(position,"Icon Position",description,editable(enforced));
+        Button button=addRenderableWidget(GuardUi.button("Edit Position",settingX(),row(position),settingWidth(),20,()->openIconPosition(enforced)));
+        button.active=editable(enforced);tip(button,scope(enforced,description));
+    }
+    private void openIconPosition(boolean enforced){
+        int[] draft=(enforced?configDraft.enforcedDefaults:configDraft.extraClient).clone();
+        Minecraft.getInstance().setScreen(new GuardIconPositionScreen(this,draft,()->enforced?operator:!GuardClient.clientCategoryLocked(GuardClientPreset.HUD),values->{
+            int[] target=enforced?configDraft.enforcedDefaults:configDraft.extraClient;
+            for(int i:GuardIconPositionScreen.SLOTS)target[i]=values[i];
+            dirty=true;if(enforced)dirtyServer=dirtyPolicy=true;else dirtyClient=true;
+        }));
+    }
+
+    void openHighlightPreview(boolean enforced){
+        int[] draft=(enforced?configDraft.enforcedDefaults:configDraft.extraClient).clone();
+        Minecraft.getInstance().setScreen(new GuardHighlightPreviewScreen(this,draft,editable(enforced),values->{
+            int[] target=enforced?configDraft.enforcedDefaults:configDraft.extraClient;
+            for(int i:new int[]{GuardScreenSettings.HIGHLIGHT_DIM,GuardScreenSettings.HIGHLIGHT_GLOW,GuardScreenSettings.HIGHLIGHT_FADE,GuardScreenSettings.HIGHLIGHT_DURATION,GuardScreenSettings.HIGHLIGHT_FADE_OUT})target[i]=values[i];
+            dirty=true;if(enforced)dirtyServer=dirtyPolicy=true;else dirtyClient=true;
+        }));
+    }
+
     void openImpactPreview(boolean enforced) {
         int[] draft = enforced ? configDraft.enforcedDefaults.clone() : configDraft.extraClient.clone();
         if (!enforced) { draft[40] = configDraft.impactBrightness; draft[41] = configDraft.impactContrast; draft[42] = configDraft.impactEdges; draft[43] = configDraft.impactGrain; }
         Minecraft.getInstance().setScreen(new GuardImpactPreviewScreen(this, draft, enforced ? operator : editable(false), values -> {
 
             if (enforced) {
+                configDraft.enforcedDefaults[35]=values[35];configDraft.enforcedDefaults[GuardScreenSettings.PLAYER_IMPACT_INVERT]=values[GuardScreenSettings.PLAYER_IMPACT_INVERT];
                 for (int i = 40; i <= 43; i++) configDraft.enforcedDefaults[i] = values[i];
                 for (int i = 50; i <= 57; i++) configDraft.enforcedDefaults[i] = values[i];
                 dirty = dirtyServer = dirtyPolicy = true;
             } else {
+                configDraft.impactPerfectOnly=values[35]!=0;configDraft.extraClient[GuardScreenSettings.PLAYER_IMPACT_INVERT]=values[GuardScreenSettings.PLAYER_IMPACT_INVERT];
                 configDraft.impactBrightness = values[40]; configDraft.impactContrast = values[41]; configDraft.impactEdges = values[42]; configDraft.impactGrain = values[43];
                 for (int i = 50; i <= 57; i++) configDraft.extraClient[i] = values[i];
                 dirty = dirtyClient = true;
@@ -452,7 +490,7 @@ public final class GuardConfigScreen extends Screen {
         for (GuardConfigSearch.Entry entry : results) {
             int position = controlIndex++;
             if (!visible(position)) continue;
-            String scopeName = entry.section() == 0 ? "Client" : entry.section() == 1 ? "Server" : entry.section() == 3 ? "Experimental" : entry.section()==4?"Debug":"Enforce";
+            String scopeName = entry.section() == 0 ? "Client" : entry.section() == 1 ? "Server" : entry.section() == 3 ? "Experimental" : "Enforce";
             Button result = addRenderableWidget(GuardUi.builder(Component.literal(entry.name()), b -> jumpToSetting(entry))
                 .bounds(panelLeft + 4, row(position), contentRight() - panelLeft - 8, 20).build());
             tip(result, scopeName + " > " + entry.category() + " > " + entry.name());
@@ -462,37 +500,38 @@ public final class GuardConfigScreen extends Screen {
     private void jumpToSetting(GuardConfigSearch.Entry entry) {
         settingsSearch = "";
         settingsSearchChanged = false;
-        debugSection=entry.section()==4;
         experimentalSection = entry.section() == 3;
         enforceSection = entry.section() == 2;
         clientSection = entry.section() == 0;
         page = entry.page();
         if (!enforceSection) {
-            int[] categories = debugSection ? DEBUG_PAGES : enforceSection ? ENFORCE_PAGES : clientSection ? CLIENT_PAGES : experimentalSection ? EXPERIMENTAL_PAGES : SERVER_PAGES;
+            int[] categories = enforceSection ? ENFORCE_PAGES : clientSection ? CLIENT_PAGES : experimentalSection ? EXPERIMENTAL_PAGES : SERVER_PAGES;
             for (int i = 0; i < categories.length; i++) if (categories[i] == page) {
                 sidebarOffset = Math.max(0, i - visibleSidebarTabs(categories.length) + 1);
                 break;
             }
         }
         firstRow = 0;
-        String[] sections = enforceSection ? new String[] {"World Particles","Screen Effects","Shield Icon","Audio Sliders","Hand Animation","Experimental Punchy"}
+        String[] sections = enforceSection ? page==25?new String[]{"Target Highlight"}:page==8?new String[]{"Flying Sparks","Spark Debris","Spark Tracers","Center Impact"}:page==19?FEEDBACK_GROUPS:new String[] {"World Particles","Shield Icon","Audio Sliders","Hand Animation","Experimental Punchy"}
             : clientSection ? page == 7 ? new String[] {"Flying Sparks", "Spark Debris", "Spark Tracers", "Center Impact"}
-                : page == 17 ? new String[]{"Shield Icon"} : page == 2 ? new String[] {"Screen Flash", "Camera Feedback", "Chromatic Aberration"} : page == 15 ? new String[]{"Hand Animation"} : new String[0]
+                : page == 17 ? new String[]{"Shield Icon"} : page == 2 ? FEEDBACK_GROUPS : page == 15 ? new String[]{"Hand Animation"} : new String[0]
             : switch (page) {
-                case 0 -> new String[] {"Timing", "Healing", "Damage Returned", "Parry Pushback", "Projectiles", "Explosions", "Fall Damage"};
+                case 0 -> new String[] {"Parrying","Parried","Health","Knockback","Parry Types"};
                 case 1 -> new String[] {"Guard Stance", "Projectiles", "Explosions"};
                 case 4 -> new String[] {"Valid Parry Conditions", "Priority", "Item Durability Wear"};
                 case 6 -> new String[] {"Common Damage Types"};
-                case 18 -> new String[]{"Diagnostic Logging"};
+                case 18 -> new String[]{"Combat","Animations","Effects & Performance","Config & Assignments"};
                 case 12 -> new String[] {"Parry Colors", "Spawn Equipment", "Mob Eligibility"};
-                case 11 -> new String[] {"Shield Timing", "Shield Perfect Parry", "Additional Shields and Bosses"};
+                case 24 -> new String[]{"Target Highlight"};
+                case 11 -> new String[] {"Shield Options", "Shield Perfect Parry", "Additional Shields and Bosses"};
                 default -> new String[0];
             };
-        String chosen = initialGroup();
+        String chosen = entry.group().isEmpty()?initialGroup():entry.group();
         for (GuardConfigSearch.Entry result : searchResultsForPage(entry)) {
             for (String group : sections) if (group.equals(result.name())) chosen = group;
             if (result.name().equals(entry.name())) break;
         }
+        if(!entry.group().isEmpty())chosen=entry.group();
         if (chosen != null) rememberedGroups.put(groupKey(), chosen);
         selectRememberedGroup();
         rememberLocation();
@@ -617,7 +656,9 @@ public final class GuardConfigScreen extends Screen {
     private void trackValue(int position,java.util.function.Supplier<String> value){rowValues.put(position,value);}
     private boolean rowChanged(int position){String saved=originalRows.get(position);var current=rowValues.get(position);return saved!=null&&current!=null&&!saved.equals(current.get());}
     private void rowUndo(int position,boolean server,Runnable restore){
+        rowEnabled.put(position,editable(server));
         rowRestores.put(position,()->{
+            if(!rowEnabled.getOrDefault(position,false))return;
             restore.run();dirty=true;
             if(server){dirtyServer=true;if(enforceSection)dirtyPolicy=true;else if(page==12)dirtyMobs=true;else if(page==11)dirtyShield=true;else if(page==6)dirtyDamageRules=true;else dirtyServerRules=true;}else dirtyClient=true;
             rebuildWidgets();
@@ -626,7 +667,7 @@ public final class GuardConfigScreen extends Screen {
     private void updateRowLayouts(){
         for(var entry:rowUndoButtons.entrySet()){
             boolean changed=rowChanged(entry.getKey());Button undo=entry.getValue();
-            undo.visible=changed;undo.active=changed;
+            undo.visible=changed;undo.active=changed&&rowEnabled.getOrDefault(entry.getKey(),false);
             RowControl layout=rowControls.get(entry.getKey());if(layout==null)continue;
             int reserve=changed?GuardUiLayout.UNDO_SIZE+GuardUiLayout.CONTROL_GAP:0;
             layout.widget().setX(layout.x()-(layout.header()?reserve:0));
@@ -659,86 +700,105 @@ public final class GuardConfigScreen extends Screen {
         return current.poses()==null ? appliedState.poses()!=null : !current.poses().same(appliedState.poses());
     }
     void featureDivider(String name,BooleanSupplier expanded,BooleanSupplier enabled,Consumer<Boolean> change,boolean server,String description){
-        int position=controlIndex;dropdown(name,expanded,description);
-        if(!visible(position))return;
-        trackValue(position,()->enabled.getAsBoolean()?"On":"Off");
-        if(editable(server))rowUndo(position,server,()->{
-            change.accept("On".equals(originalRows.get(position)));
-            if(name.equals("Diagnostic Logging")&&appliedState!=null)for(var entry:appliedState.fields().entrySet())if(entry.getKey().equals("debugFlags"))configDraft.debugFlags=(Integer)entry.getValue();
-        });
-        int w=Math.min(58,settingWidth());
-        Button control=addRenderableWidget(GuardUi.button(enabled.getAsBoolean()?"On":"Off",contentRight()-w-GuardUiLayout.ARROW_SLOT-GuardUiLayout.CONTROL_GAP,row(position),w,18,()->{
-            boolean value=!enabled.getAsBoolean();change.accept(value);dirty=true;if(server){dirtyServer=dirtyServerRules=true;}else dirtyClient=true;
-            if(java.util.Arrays.asList(GuardShieldReactions.NAMES).contains(name))reactionGroup=value?name:"";else rememberedGroups.put(groupKey(),value?name:"");selectRememberedGroup();rebuildWidgets();
-        }));control.active=editable(server);tip(control,scope(server,description));
+        controls(true);
+        boolean on=enabled.getAsBoolean();int position=controlIndex;
+        dropdownRow(name,expanded,description,pageControlsEnabled&&on);
+        if(visible(position)){
+            trackValue(position,()->enabled.getAsBoolean()?"On":"Off");
+            if(editable(server)&&on)rowUndo(position,server,()->change.accept("On".equals(originalRows.get(position))));
+            int w=Math.min(58,settingWidth());
+            Button control=addRenderableWidget(GuardUi.button(on?"On":"Off",contentRight()-w-GuardUiLayout.ARROW_SLOT-GuardUiLayout.CONTROL_GAP,row(position),w,18,()->{
+                boolean value=!enabled.getAsBoolean();change.accept(value);markChanged(server);
+                if(java.util.Arrays.asList(GuardShieldReactions.NAMES).contains(name))reactionGroup=value?name:"";
+                else rememberedGroups.put(groupKey(),value?name:"");
+                selectRememberedGroup();rebuildWidgets();
+            }));control.active=editable(server);tip(control,scope(server,description));
+        }
+        controls(on);
     }
     void buildDiagnostics(){
-        featureDivider("Diagnostic Logging",()->diagnosticOpen,()->configDraft.debugFlags!=0,value->configDraft.debugFlags=value?GuardDiagnostics.DEFAULT_EVENT_GROUPS:0,false,"Write diagnostic events to latest.log. Default: Off. Identical repeated messages are suppressed.");
-        if(!diagnosticOpen||configDraft.debugFlags==0)return;
-        String[] names={"Guard Events","Damage & Projectiles","Animations","Config & Sync","Mob Guard","Punchy Reactions","Punchy Hand Transitions","Punchy Item Priority","Particle Collision Profiling"};
-        String[] descriptions={"Guard input and server-confirmed stance changes.","Damage results and projectile feedback.","Guard pose selection, timing, and easing.","Config saves and synchronization.","Mob guarding events.","Reaction triggers, peak holds, rendered offsets, and hitlag recovery.","Pose release, empty-offhand lowering, and visibility changes.","When native item use or another Punchy clip takes priority.","Time collision queries for all three particle types. Summaries reach latest.log every 100 game ticks. Profiling adds overhead."};
-        for(int i=0;i<names.length;i++){final int mask=1<<i;toggle(names[i],()->(configDraft.debugFlags&mask)!=0,value->configDraft.debugFlags=value?configDraft.debugFlags|mask:configDraft.debugFlags&~mask,false,descriptions[i]+(i==8?" Default: Off; enable explicitly for a test.":" Event logging only; no continuous frame logs. Default: On when diagnostic logging is enabled."));}
+        int master=controlIndex;
+        toggle("Diagnostic Logging",()->configDraft.debugFlags!=0,value->configDraft.debugFlags=value?GuardDiagnostics.DEFAULT_EVENT_GROUPS:0,false,"Write local diagnostic events to latest.log. Off stops logging and profiling. Default: Off.");
+        rowUndo(master,false,()->configDraft.debugFlags=(Integer)appliedState.fields().get("debugFlags"));
+        pageControls(configDraft.debugFlags!=0);
+        for(String group:new String[]{"Combat","Animations","Effects & Performance","Config & Assignments"}){
+            dropdown(group,()->diagnosticGroup.equals(group),"Local diagnostics. Select channels for a test, then Apply; turn them off afterward.");
+            if(!diagnosticGroup.equals(group))continue;
+            for(var channel:GuardDiagnostics.channels())if(channel.category().equals(group)){
+                int flag=channel.flag();
+                toggle(channel.name(),()->(configDraft.debugFlags&flag)!=0,value->configDraft.debugFlags=value?configDraft.debugFlags|flag:configDraft.debugFlags&~flag,false,channel.description()+"\n"+(channel.profiling()?"Off by default; enable explicitly for a test.":"Event logging only; no continuous frame logs.")+" Default: Off.");
+            }
+        }
     }
     void buildShieldReactions(boolean enforced){
         int[] target=enforced?configDraft.enforcedDefaults:configDraft.extraClient;
+        boolean parentEnabled=pageControlsEnabled;
+        pageControls(parentEnabled&&(enforced?target[0]!=0&&target[1]!=0:configDraft.hud&&configDraft.shieldEffects));
         for(int r=0;r<GuardShieldReactions.NAMES.length;r++){
             int base=GuardShieldReactions.OFFSET+r*GuardShieldReactions.STRIDE;
             String name=GuardShieldReactions.NAMES[r];
             featureDivider(name,()->reactionGroup.equals(name),()->target[base]!=0,value->{target[base]=value?1:0;if(enforced)dirtyServer=dirtyPolicy=true;},enforced,"Animate the "+name.toLowerCase(Locale.ROOT)+" reaction. Default: On.");
             if(!reactionGroup.equals(name)||target[base]==0)continue;
-            for(int c=1;c<6;c++){final int index=base+c;if((r==0&&c==4)||(r==4&&(c==2||c==4)))continue;slider(name+" "+GuardShieldReactions.CONTROLS[c],()->target[index],c==5?1:0,GuardShieldReactions.max(r*6+c),c==5?" ticks":"%",1,enforced,value->{target[index]=value;if(enforced)dirtyServer=dirtyPolicy=true;},c==5?"How long the reaction lasts. Default: "+GuardShieldReactions.defaultValue(r*6+c)+" ticks.":"Scale this part of the reaction. 100% preserves its default appearance; 0 disables it. Default: 100%.");}
+            for(int c=1;c<6;c++){
+                if(!GuardShieldReactions.used(r*6+c))continue;final int reaction=r,component=c,index=base+c;
+                String componentName=c==1?(r==4?"Lift":"Expansion"):c==3?"Highlight":GuardShieldReactions.CONTROLS[c];
+                controls(target[base]!=0);
+                if(c<5){int toggleIndex=GuardScreenSettings.REACTION_TOGGLES+r*4+c-1;controlBindings.put(name+" "+componentName,GuardControlSettings.presetBinding(toggleIndex));toggle(name+" "+componentName,()->target[toggleIndex]!=0,value->target[toggleIndex]=value?1:0,enforced,GuardScreenSettings.tip(toggleIndex));controls(target[base]!=0&&target[toggleIndex]!=0);}
+                slider(name+" "+componentName+(c<5?" Strength":""),()->target[index],c==5?1:0,GuardShieldReactions.max(r*6+c),c==5?" ticks":"%",1,enforced,value->{target[index]=value;if(enforced)dirtyServer=dirtyPolicy=true;},c==5?"Reaction lifetime. 20 ticks = 1 second.":component==1&&reaction==4?"How far the ready icon lifts. 100% retains its normal movement.":"Scale this icon component. 100% retains its normal appearance.");
+            }
         }
     }
 
     void dropdown(String name, BooleanSupplier expanded, String description) {
+        controls(true);dropdownRow(name,expanded,description,pageControlsEnabled);
+    }
+    private void dropdownRow(String name,BooleanSupplier expanded,String description,boolean enabled){
         int position = controlIndex++;
         visibleSettingRows.putIfAbsent(name, position);
         if (!visible(position)) return;
-        dropdownLabels.add(new DropdownLabel(name, row(position), expanded, GuardUi.tooltipLines(description)));
+        dropdownLabels.add(new DropdownLabel(name, row(position), expanded, GuardUi.tooltipLines(description),enabled));
     }
 
     private String groupKey() {
-        return (debugSection ? "debug" : enforceSection ? "enforce" : experimentalSection ? "experimental" : clientSection ? "client" : "server") + ":" + page;
+        return (enforceSection ? "enforce" : experimentalSection ? "experimental" : clientSection ? "client" : "server") + ":" + page;
     }
 
     private String initialGroup() {
-        if(enforceSection)return configDraft.enforceEnabled?switch(page){case 19->"Screen Effects";case 20->"Shield Icon";case 21->"Audio Sliders";case 22->"Hand Animation";case 23->"Experimental Punchy";default->"World Particles";}:null;
+        if(enforceSection)return configDraft.enforceEnabled?switch(page){case 19->"Hitlag";case 25->"Target Highlight";case 20->"Shield Icon";case 21->"Audio Sliders";case 22->"Hand Animation";case 23->"Experimental Punchy";default->"Flying Sparks";}:null;
         return switch (page) {
             case 7 -> "Flying Sparks";
-            case 2 -> clientSection ? "Screen Flash" : null;
+            case 2 -> clientSection ? "Hitlag" : null;
             case 17 -> "Shield Icon";
-            case 18 -> "Diagnostic Logging";
+            case 18 -> "Combat";
             case 15 -> "Hand Animation";
-            case 0 -> "Timing";
+            case 0 -> "Parrying";
             case 1 -> "Guard Stance";
             case 4 -> clientSection ? null : "Valid Parry Conditions";
             case 6 -> "Common Damage Types";
             case 12 -> "Parry Colors";
-            case 11 -> "Shield Timing";
+            case 24 -> "Target Highlight";
+            case 11 -> "Shield Options";
             default -> null;
         };
     }
 
     void selectRememberedGroup() {
         String selected = rememberedGroups.getOrDefault(groupKey(), initialGroup());
-        if(page==7 && selected!=null && !selected.isEmpty() && !java.util.Set.of("Spark Tracers","Flying Sparks","Spark Debris","Center Impact").contains(selected)){selected="Spark Tracers";rememberedGroups.put(groupKey(),selected);}
-        centerImpactOpen = "Center Impact".equals(selected) && page == 7;
-        sparkTracersOpen = "Spark Tracers".equals(selected) && page == 7;
-        animatedOpen = "Flying Sparks".equals(selected) && page == 7;
-        dotStreaksOpen = "Spark Debris".equals(selected) && page == 7;
+        if((page==7||page==8) && selected!=null && !selected.isEmpty() && !java.util.Set.of("Spark Tracers","Flying Sparks","Spark Debris","Center Impact").contains(selected)){selected="Spark Tracers";rememberedGroups.put(groupKey(),selected);}
+        if((clientSection&&page==2)||(enforceSection&&page==19))feedbackGroup=selected==null?"":java.util.Arrays.asList(FEEDBACK_GROUPS).contains(selected)?selected:"";
+        if(page==24||page==25)feedbackGroup="Target Highlight".equals(selected)?"Target Highlight":"";
+        whenParriedOpen="Parried".equals(selected)&&!clientSection&&page==0;
+        centerImpactOpen = "Center Impact".equals(selected) && (page == 7||page==8);
+        sparkTracersOpen = "Spark Tracers".equals(selected) && (page == 7||page==8);
+        animatedOpen = "Flying Sparks".equals(selected) && (page == 7||page==8);
+        dotStreaksOpen = "Spark Debris".equals(selected) && (page == 7||page==8);
         shieldOpen = "Shield Icon".equals(selected) && clientSection && page == 17;
-        fallOpen="Fall Damage".equals(selected)&&page==0;
-        diagnosticOpen="Diagnostic Logging".equals(selected)&&page==18;
-        screenFlashOpen = "Screen Flash".equals(selected) && clientSection && page == 2;
-        cameraFeedbackOpen = "Camera Feedback".equals(selected) && clientSection && page == 2;
-        chromaticOpen = "Chromatic Aberration".equals(selected) && clientSection && page == 2;
+        fallOpen="Parry Types".equals(selected)&&page==0;
+        if(page==18)diagnosticGroup=selected==null?"":selected;
         animationOpen = "Hand Animation".equals(selected) && clientSection && page == 15;
-        healingOpen = "Healing".equals(selected) && !clientSection && page == 0;
-        timingOpen = "Timing".equals(selected) && !clientSection && page == 0;
-        retaliationOpen = "Damage Returned".equals(selected) && page == 0;
-        pushbackOpen = "Parry Pushback".equals(selected) && page == 0;
-        parryProjectileOpen = "Projectiles".equals(selected) && page == 0;
-        parryExplosionOpen = "Explosions".equals(selected) && page == 0;
+        healingOpen = "Health".equals(selected) && !clientSection && page == 0;
+        timingOpen = "Parrying".equals(selected) && !clientSection && page == 0;
+        pushbackOpen = "Knockback".equals(selected) && page == 0;
         guardOpen = "Guard Stance".equals(selected) && page == 1;
         blockProjectileOpen = "Projectiles".equals(selected) && page == 1;
         blockExplosionOpen = "Explosions".equals(selected) && page == 1;
@@ -748,22 +808,20 @@ public final class GuardConfigScreen extends Screen {
         mobColorsOpen = "Parry Colors".equals(selected) && page == 12;
         mobEquipmentOpen = "Spawn Equipment".equals(selected) && page == 12;
         mobEligibilityOpen = "Mob Eligibility".equals(selected) && page == 12;
-        shieldTimingOpen = "Shield Timing".equals(selected) && page == 11;
+        shieldTimingOpen = "Shield Options".equals(selected) && page == 11;
         shieldPerfectOpen = "Shield Perfect Parry".equals(selected) && page == 11;
         shieldIdsOpen = "Additional Shields and Bosses".equals(selected) && page == 11;
         commonDamageOpen = "Common Damage Types".equals(selected) && page == 6;
-        enforceParticlesOpen = "World Particles".equals(selected) && configDraft.enforceEnabled;
         enforceHudOpen = ("Screen Effects".equals(selected)||"Shield Icon".equals(selected)||"Hand Animation".equals(selected)) && configDraft.enforceEnabled;
         enforceAudioOpen = "Audio Sliders".equals(selected) && configDraft.enforceEnabled;
         enforcePunchyOpen = "Experimental Punchy".equals(selected) && configDraft.enforceEnabled;
     }
 
     private void rememberLocation() {
-        rememberedSection = debugSection ? 4 : experimentalSection ? 3 : enforceSection ? 2 : clientSection ? 0 : 1;
+        rememberedSection = experimentalSection ? 3 : enforceSection ? 2 : clientSection ? 0 : 1;
         if (experimentalSection) { rememberedExperimentalPage = page; rememberedExperimentalRow = firstRow; }
         else if (enforceSection) {rememberedEnforceRow=firstRow;rememberedEnforcePage=page;}
         else if (clientSection) { rememberedClientPage = page; rememberedClientRow = firstRow; }
-        else if(debugSection){rememberedDebugPage=page;}
         else {rememberedServerPage = page; rememberedServerRow = firstRow;}
     }
 
@@ -778,7 +836,7 @@ public final class GuardConfigScreen extends Screen {
     void particleAppearance(boolean server,int first,int end) {
         int[] settings=server?configDraft.enforcedDefaults:configDraft.extraClient;
         for(int i:particleAppearanceOrder(first,end)) {
-            if(GuardParticleColors.retired(i)||!server&&i>=GuardParticleColors.FLYING_ENABLED&&i<=GuardParticleColors.IMPACT_ENABLED)continue;
+            if(GuardParticleColors.retired(i)||i>=GuardParticleColors.FLYING_ENABLED&&i<=GuardParticleColors.IMPACT_ENABLED)continue;
             final int index=i;String label=GuardParticleColors.LABELS[i-GuardParticleColors.OFFSET];
             controlBindings.put(label, GuardControlSettings.presetBinding(i));
             if(GuardParticleColors.toggleSlot(i))toggle(label,()->settings[index]!=0,v->settings[index]=v?1:0,server,GuardParticleColors.tip(i));
@@ -788,80 +846,46 @@ public final class GuardConfigScreen extends Screen {
     }
 
     void buildEnforcedDefaults() {
-        if(page==8)dropdown("World Particles", () -> enforceParticlesOpen, "Set starting appearance and intensity for the sparks and center impact.");
-        if (page==8 && configDraft.enforceEnabled && enforceParticlesOpen) {
-            dontEnforce(GuardClientPreset.PARTICLES);
-            presetSlider("Base Intensity",16,0,100,"%");
-            presetSlider("Perfect Intensity",17,0,100,"%");
-            presetSlider("Damage Intensity",18,0,100,"%");
-            presetSlider("Debris Base Intensity",19,0,100,"%");
-            presetSlider("Debris Perfect Intensity",20,0,100,"%");
-            presetSlider("Debris Damage Intensity",21,0,100,"%");
-            for(int i:GuardSparkTracerConfig.DISPLAY_ORDER)presetSlider(GuardSparkTracerConfig.LABELS[i],GuardSparkTracerConfig.OFFSET+i,0,100,"%");
-            particleAppearance(true,GuardParticleColors.OFFSET,GuardParticleColors.LENGTH);
+        if(page==19&&configDraft.enforceEnabled){dontEnforce(GuardClientPreset.SCREEN);buildFeedback(true);return;}
+        if(page==25&&configDraft.enforceEnabled){dontEnforce(GuardClientPreset.SCREEN);buildHighlight(true);return;}
+        if(page==8&&configDraft.enforceEnabled){dontEnforce(GuardClientPreset.PARTICLES);GuardConfigPages.buildWorldParticles(this,true);return;}
+        if(page==20&&configDraft.enforceEnabled){
+            dontEnforce(GuardClientPreset.HUD);
+            featureDivider("Shield Icon",()->enforceHudOpen,()->configDraft.enforcedDefaults[0]!=0,value->configDraft.enforcedDefaults[0]=value?1:0,true,"Show the shield icon and its reactions. Off keeps the reaction settings.");
+            if(enforceHudOpen){buildIconPosition(true);presetToggle("Shield reactions",1);buildShieldReactions(true);}
         }
-        if(page==19||page==20||page==22)dropdown(page==20?"Shield Icon":page==22?"Hand Animation":"Screen Effects", () -> enforceHudOpen, "Set the server's starting HUD and screen feedback values.");
-        if ((page==19||page==20||page==22) && configDraft.enforceEnabled && enforceHudOpen) {
-            dontEnforce(page==20?GuardClientPreset.HUD:page==22?GuardClientPreset.ANIMATIONS:GuardClientPreset.SCREEN);
-            if(page==20){presetToggle("Shield icon",0);presetToggle("Shield reactions",1);buildShieldReactions(true);}
-            if(page==19){
-            presetToggle("Screen flash", 2);
-            presetToggle("Meme flash", 24);
-            presetToggle("Perfect only flash", 27);
-            presetSlider("Regular parry hitlag", 62, 0, 10, " frames");
-            presetSlider("Screen flash strength", 4, 0, 100, "%");
-            presetSlider("Camera shake", 5, 0, 100, "%");
-            presetSlider("Perfect parry hitlag", 3, 0, 10, " frames");
-            presetToggle("Impact frame", 34);
-            presetToggle("Perfect only impact", 35);
-            int previewRow = controlIndex++;
-            if (visible(previewRow)) {
-                settingLabel(previewRow, "Impact preview", "Tune the enforced impact image with a captured scene. Changes save when you press Apply.", operator);
-                Button preview = addRenderableWidget(GuardUi.builder(Component.literal("Preview"), b ->
-                    openImpactPreview(true)).bounds(settingX(), row(previewRow), settingWidth(), 20).build());
-                preview.active = operator;
-                tip(preview, "Open the preview to tune enforced impact values.");
-            }
-            }
-            if(page==22){presetToggle("Third-person guard pose",49);presetToggle("First-person guard pose",11);}
-            if(page==19){
-            presetSlider("Chromatic intensity", 58, 0, 200, "%");
-            presetSlider("Chromatic duration", 59, 1, 40, " ticks");
-            presetToggle("Perfect only chromatic", 60);
-            presetToggle("Chromatic affects HUD", 61);
-            }
-
-        }
-
-        if(page==23)dropdown("Experimental Punchy", () -> enforcePunchyOpen, "Set the five Parrying presets used by locked clients. Default: All five presets enabled; Preset 5 is empty-hand only.");
-        if (page==23 && configDraft.enforceEnabled && enforcePunchyOpen) {
+        if(page==22)dropdown("Hand Animation",()->enforceHudOpen,"Set the server's starting hand animation values.");
+        if(page==22&&configDraft.enforceEnabled&&enforceHudOpen){dontEnforce(GuardClientPreset.ANIMATIONS);presetToggle("Third-person guard pose",49);presetToggle("First-person guard pose",11);}
+        if(page==23&&configDraft.enforceEnabled){
             dontEnforce(GuardClientPreset.PUNCHY);
-            controlBindings.put("Release delay", Control.PUNCHY_RELEASE_DELAY.binding(false));
-            slider("Release delay", () -> configDraft.enforcedDefaults[GuardPoseSettings.RELEASE_DELAY_SLOT], 0, 1000, " ms", 1, true, v -> configDraft.enforcedDefaults[GuardPoseSettings.RELEASE_DELAY_SLOT]=v, "Extra hold after hitlag finishes. No extra delay when hitlag does not occur. Applies to every Punchy preset. Default: 50 ms.");
-            poseEditor(true);
-
+            featureDivider("Experimental Punchy",()->enforcePunchyOpen,()->configDraft.enforcedDefaults[65]!=0,value->configDraft.enforcedDefaults[65]=value?1:0,true,"Use paired guarding and parried presets. Off keeps your presets and assignments.");
+            if(enforcePunchyOpen){
+                controlBindings.put("After Hitlag Hold",Control.PUNCHY_RELEASE_DELAY.binding(false));
+                slider("After Hitlag Hold",()->configDraft.enforcedDefaults[GuardPoseSettings.RELEASE_DELAY_SLOT],0,1000," ms",1,true,v->configDraft.enforcedDefaults[GuardPoseSettings.RELEASE_DELAY_SLOT]=v,"Extra hold after hitlag. No extra delay without hitlag. Applies to every preset.");
+                poseEditor(true);
+            }
         }
         if(page==21)dropdown("Audio Sliders", () -> enforceAudioOpen, "Set the server's starting local playback volumes.");
         if (page==21 && configDraft.enforceEnabled && enforceAudioOpen) {
             dontEnforce(GuardClientPreset.AUDIO);
-            presetSlider("Master volume", 12, 0, 200, "%");
-            presetSlider("Perfect volume", 14, 0, 200, "%");
-            presetSlider("Parry volume", 13, 0, 200, "%");
-            presetSlider("Block volume", 15, 0, 200, "%");
+            presetSlider("Master volume", 12, "%");
+            presetSlider("Perfect volume", 14, "%");
+            presetSlider("Parry volume", 13, "%");
+            presetSlider("Block volume", 15, "%");
         }
     }
 
     void poseEditor(boolean server) {
         int position = controlIndex++;
-        visibleSettingRows.putIfAbsent("Parry Animation Stance", position);
+        visibleSettingRows.putIfAbsent("Pose Presets", position);
         if (!visible(position)) return;
-        String description = "Edit built-in and custom Parrying presets, placement, motion and item assignments. Requires Punchy. Default: All five presets enabled; Preset 5 is empty-hand only.";
-        settingLabel(position, "Parry Animation Stance", scope(server, description), editable(server));
+        String description = "Edit paired Guarding and Parried poses, motion and shared item assignments. Requires Punchy.\nDefault: Five enabled presets; Preset 5 uses empty hands.";
+        settingLabel(position, "Pose Presets", scope(server, description), editable(server));
         Button editor = addRenderableWidget(GuardUi.builder(Component.literal("Edit Presets"), b -> {
             int[] source = server ? configDraft.enforcedDefaults : configDraft.extraClient;
             GuardPoseManagerScreen.Draft draft = poseDraft.copy();
             draft.enabled=source[65]!=0;
-            if (server) { draft.poses.clear(); for (int i=0;i < GuardPoseSettings.COUNT;i++) { var pose=dev.zeli.mallardguard.GuardPoseLibrary.preset(i); pose.values=dev.zeli.mallardguard.GuardPoseSettings.pose(source,i);pose.enabled=pose.values[0]!=0;draft.poses.add(pose); } var enforced=dev.zeli.mallardguard.GuardPoseLibrary.parseAnimations(configDraft.enforcedPoseData);if(enforced!=null)draft.poses=new java.util.ArrayList<>(enforced); }
+            if (server) { draft.poses.clear(); for (int i=0;i < GuardPoseSettings.COUNT;i++) { var pose=dev.zeli.mallardguard.GuardPoseLibrary.preset(i); pose.values=dev.zeli.mallardguard.GuardPoseSettings.pose(source,i);pose.parriedValues=dev.zeli.mallardguard.GuardPoseSettings.defaultParriedPose(pose.values);pose.enabled=pose.values[0]!=0;draft.poses.add(pose); } var enforced=dev.zeli.mallardguard.GuardPoseLibrary.parseAnimations(configDraft.enforcedPoseData);if(enforced!=null)draft.poses=new java.util.ArrayList<>(enforced); }
             Minecraft.getInstance().setScreen(new GuardPoseManagerScreen(this, draft, editable(server), result -> {
 
                 for (int i=0;i < GuardPoseSettings.COUNT;i++) { var pose=result.poses.get(i); int[] values=pose.values.clone();values[0]=pose.enabled?1:0;System.arraycopy(values,0,source,dev.zeli.mallardguard.GuardPoseSettings.OFFSET+i*23,23); }
@@ -873,6 +897,76 @@ public final class GuardConfigScreen extends Screen {
             }));
         }).bounds(settingX(), row(position), settingWidth(), 20).build());
         editor.active = editable(server) && PunchyGuardCompat.supportedVersion(); tip(editor, scope(server, description));
+    }
+
+    private int feedbackValue(boolean server,int index){
+        if(server)return configDraft.enforcedDefaults[index];
+        return switch(index){case 3->configDraft.hitlagTicks;case 4->configDraft.flashStrength;case 5->configDraft.shakeStrength;case 24->configDraft.memeFlash?1:0;case 27->configDraft.perfectOnlyFlash?1:0;case 34->configDraft.impactFrames;case 35->configDraft.impactPerfectOnly?1:0;default->configDraft.extraClient[index];};
+    }
+    private void feedbackValue(boolean server,int index,int value){
+        if(server){configDraft.enforcedDefaults[index]=value;dirtyServer=dirtyPolicy=true;return;}
+        switch(index){case 3->configDraft.hitlagTicks=value;case 4->configDraft.flashStrength=value;case 5->configDraft.shakeStrength=value;case 24->configDraft.memeFlash=value!=0;case 27->configDraft.perfectOnlyFlash=value!=0;case 34->configDraft.impactFrames=value;case 35->configDraft.impactPerfectOnly=value!=0;default->configDraft.extraClient[index]=value;}
+    }
+    private void feedbackToggle(boolean server,int index,String name,String tip){controlBindings.put(name,GuardControlSettings.presetBinding(index));toggle(name,()->feedbackValue(server,index)!=0,value->feedbackValue(server,index,value?1:0),server,tip);}
+    private void feedbackSlider(boolean server,int index,String name,String suffix,String tip){var binding=GuardControlSettings.presetBinding(index);controlBindings.put(name,binding);slider(name,()->feedbackValue(server,index),binding.minimum(),binding.maximum(),suffix,1,server,value->feedbackValue(server,index,value),tip);}
+    private boolean feedbackSection(boolean server,String name,int toggle,String tip){
+        featureDivider(name,()->feedbackGroup.equals(name),()->feedbackValue(server,toggle)!=0,value->feedbackValue(server,toggle,value?1:0),server,tip);
+        return feedbackGroup.equals(name);
+    }
+    private void feedbackColor(boolean server,int index){
+        controlBindings.put(GuardScreenSettings.label(index),GuardControlSettings.presetBinding(index));
+        colorField(GuardScreenSettings.label(index),()->feedbackValue(server,index),v->feedbackValue(server,index,v),server,GuardScreenSettings.tip(index));
+    }
+    private void feedbackPreview(boolean server,String label,Runnable action,String tip){
+        int position=controlIndex++;if(!visible(position))return;
+        settingLabel(position,label,tip,editable(server));var button=addRenderableWidget(GuardUi.button("Preview",settingX(),row(position),settingWidth(),20,action));button.active=editable(server);tip(button,tip);
+    }
+    void buildFeedback(boolean server){
+        if(feedbackSection(server,"Hitlag",GuardScreenSettings.HITLAG_ENABLED,GuardScreenSettings.tip(GuardScreenSettings.HITLAG_ENABLED))){
+            feedbackToggle(server,GuardScreenSettings.HITLAG_PERFECT_ONLY,"Perfect Only","Only perfect parries freeze the view. Hidden regular values are preserved.");
+            feedbackSlider(server,3,"Hitlag Duration"," ticks","Local freeze duration. 20 ticks = one second.");
+            if(feedbackValue(server,GuardScreenSettings.HITLAG_PERFECT_ONLY)==0)feedbackSlider(server,62,"Regular Duration"," ticks","Local regular-parry freeze. 0 disables it.");
+        }
+        if(feedbackSection(server,"Impact Frame",34,"Brief high-contrast, grayscale treatment of your view.\nUses the corresponding hitlag duration.\nFor the best effect, set perfect hitlag to 6 ticks.")){
+            feedbackToggle(server,35,"Perfect Only","Only perfect parries use Impact Frame. Default: On.");
+            feedbackPreview(server,"Preview",()->openImpactPreview(server),"Adjust the appearance against a paused scene.\nUses hitlag duration even when hitlag is disabled.");
+        }
+        if(feedbackSection(server,"White Flash",2,"Briefly washes your view in white when a parry succeeds.\nIntensity controls how visible the flash is.")){
+            feedbackToggle(server,27,"Perfect Only","Only perfect parries show White Flash.");
+            feedbackSlider(server,4,"Perfect Intensity","%","How visible the brief white flash is on a perfect parry.");
+            if(feedbackValue(server,27)==0)feedbackSlider(server,GuardScreenSettings.FLASH_REGULAR_STRENGTH,"Regular Intensity","%",GuardScreenSettings.tip(GuardScreenSettings.FLASH_REGULAR_STRENGTH));
+            feedbackToggle(server,24,"Meme Flash","Show a random joke image with White Flash. Default: Off.");
+        }
+        if(feedbackSection(server,"Camera Shake",GuardScreenSettings.CAMERA_ENABLED,GuardScreenSettings.tip(GuardScreenSettings.CAMERA_ENABLED))){
+            feedbackToggle(server,GuardScreenSettings.SHAKE_PERFECT_ONLY,"Perfect Only","Only perfect parries shake the camera.");
+            feedbackSlider(server,GuardScreenSettings.SHAKE_PERFECT_DURATION,"Perfect Duration"," ticks",GuardScreenSettings.tip(GuardScreenSettings.SHAKE_PERFECT_DURATION));
+            feedbackSlider(server,5,"Perfect Strength","%","Perfect camera shake strength. 0 disables motion.");
+            if(feedbackValue(server,GuardScreenSettings.SHAKE_PERFECT_ONLY)==0){feedbackSlider(server,GuardScreenSettings.SHAKE_REGULAR_DURATION,"Regular Duration"," ticks",GuardScreenSettings.tip(GuardScreenSettings.SHAKE_REGULAR_DURATION));feedbackSlider(server,GuardScreenSettings.SHAKE_REGULAR_STRENGTH,"Regular Strength","%",GuardScreenSettings.tip(GuardScreenSettings.SHAKE_REGULAR_STRENGTH));}
+        }
+        if(feedbackSection(server,"Chromatic Aberration",GuardScreenSettings.CHROMATIC_ENABLED,GuardScreenSettings.tip(GuardScreenSettings.CHROMATIC_ENABLED))){
+            feedbackToggle(server,60,"Perfect Only","Only perfect parries trigger RGB separation.");
+            feedbackSlider(server,59,"Perfect Duration"," ticks","Perfect-parry RGB separation lifetime.");
+            if(feedbackValue(server,60)==0)feedbackSlider(server,GuardScreenSettings.CHROMATIC_REGULAR_DURATION,"Regular Duration"," ticks",GuardScreenSettings.tip(GuardScreenSettings.CHROMATIC_REGULAR_DURATION));
+            feedbackToggle(server,61,"Include HUD","Apply the color separation to the world and HUD.\nDisabled keeps the HUD clear.");
+        }
+    }
+
+    void buildHighlight(boolean server){
+        if(feedbackSection(server,"Target Highlight",GuardScreenSettings.HIGHLIGHT_ENABLED,GuardScreenSettings.tip(GuardScreenSettings.HIGHLIGHT_ENABLED))){
+            feedbackToggle(server,GuardScreenSettings.HIGHLIGHT_PERFECT_ONLY,"Perfect Only","Only perfect parries highlight the opponent.");
+            feedbackToggle(server,GuardScreenSettings.HIGHLIGHT_ATTACKER_ENABLED,"Attacker Highlight",GuardScreenSettings.tip(GuardScreenSettings.HIGHLIGHT_ATTACKER_ENABLED));
+            controls(feedbackValue(server,GuardScreenSettings.HIGHLIGHT_ENABLED)!=0&&feedbackValue(server,GuardScreenSettings.HIGHLIGHT_ATTACKER_ENABLED)!=0);
+            feedbackColor(server,GuardScreenSettings.HIGHLIGHT_ATTACKER_COLOR);
+            controls(feedbackValue(server,GuardScreenSettings.HIGHLIGHT_ENABLED)!=0);
+            feedbackToggle(server,GuardScreenSettings.HIGHLIGHT_TARGET_ENABLED,"Target Highlight",GuardScreenSettings.tip(GuardScreenSettings.HIGHLIGHT_TARGET_ENABLED));
+            controls(feedbackValue(server,GuardScreenSettings.HIGHLIGHT_ENABLED)!=0&&feedbackValue(server,GuardScreenSettings.HIGHLIGHT_TARGET_ENABLED)!=0);
+            feedbackColor(server,GuardScreenSettings.HIGHLIGHT_TARGET_COLOR);
+            controls(feedbackValue(server,GuardScreenSettings.HIGHLIGHT_ENABLED)!=0);
+            choice("Timing",new String[]{"Before","After"},()->feedbackValue(server,GuardScreenSettings.HIGHLIGHT_AFTER),v->{feedbackValue(server,GuardScreenSettings.HIGHLIGHT_AFTER,v);rebuildWidgets();},GuardScreenSettings.tip(GuardScreenSettings.HIGHLIGHT_AFTER),server);
+            feedbackSlider(server,GuardScreenSettings.HIGHLIGHT_DURATION,GuardScreenSettings.label(GuardScreenSettings.HIGHLIGHT_DURATION),GuardScreenSettings.unit(GuardScreenSettings.HIGHLIGHT_DURATION),GuardScreenSettings.tip(GuardScreenSettings.HIGHLIGHT_DURATION));
+            for(int index:new int[]{GuardScreenSettings.HIGHLIGHT_DIM,GuardScreenSettings.HIGHLIGHT_FADE,GuardScreenSettings.HIGHLIGHT_FADE_OUT,GuardScreenSettings.HIGHLIGHT_GLOW})feedbackSlider(server,index,GuardScreenSettings.label(index),GuardScreenSettings.unit(index),GuardScreenSettings.tip(index));
+            feedbackPreview(server,"Preview",()->openHighlightPreview(server),"Still preview holds full strength. Play Once tests both fades without combat.");
+        }
     }
 
     private void dontEnforce(int category) {
@@ -887,20 +981,23 @@ public final class GuardConfigScreen extends Screen {
             "Starting client value. Locked unless Don't Enforce is enabled.");
     }
 
-    private void presetSlider(String name, int index, int min, int max, String suffix) {
+    private void presetSlider(String name, int index, String suffix) {
         var binding = GuardControlSettings.presetBinding(index);
         controlBindings.put(name, binding);
         slider(name, () -> configDraft.enforcedDefaults[index], binding.minimum(), binding.maximum(), suffix, binding.scale(), true, value -> configDraft.enforcedDefaults[index] = value,
-            "Starting client value. Locked unless Don't Enforce is enabled."
-                + (index == 3 ? " When Screen Effects is locked, this hitlag duration also controls whether perfect retaliation waits for feedback completion." : ""));
+            "Starting client value. Locked unless Don't Enforce is enabled.");
     }
 
     private boolean editable(boolean server) {
-        return server ? operator : !GuardClient.clientCategoryLocked(activeClientCategory);
+        return featureControlsEnabled&&permitted(server);
+    }
+    private boolean permitted(boolean server){
+        return server?operator:!GuardClient.clientCategoryLocked(activeClientCategory);
     }
 
     private String scope(boolean server, String description) {
-        return description + (server ? operator ? "" : " OP required." : editable(false) ? "" : " Locked by server.");
+        return description + (server ? operator ? "" : " OP required." : permitted(false) ? "" : " Locked by server.")
+            +(!featureControlsEnabled?"\nEnable the parent feature to edit.":"");
     }
 
     void settingLabel(int index, String name, String description, boolean enabled) {
@@ -913,7 +1010,7 @@ public final class GuardConfigScreen extends Screen {
         var binding = controlBindings.get(name);
         Object value = binding == null ? null : binding.defaultValue();
         if(value==null)return null;
-        if(name.startsWith("Mob Tracer "))return String.format("#%06X",((Number)value).intValue());
+        if(name.endsWith("Color")&&value instanceof Number color)return String.format("#%06X",color.intValue());
         int appearance=GuardParticleColors.indexOf(binding.setting());
         if(appearance>=0){
             int number=((Number)value).intValue();
@@ -923,7 +1020,7 @@ public final class GuardConfigScreen extends Screen {
         }
         if(value instanceof Boolean b)return b ? "On" : "Off";
         String suffix=switch(name) {
-            case "Release delay" -> " ms";
+            case "After Hitlag Hold" -> " ms";
             case "Perfect window" -> " ticks";
             case "Parry window" -> " ticks";
             case "Recharge" -> " ticks";
@@ -943,7 +1040,6 @@ public final class GuardConfigScreen extends Screen {
             case "Base Intensity", "Perfect Intensity", "Damage Intensity", "Debris Base Intensity", "Debris Perfect Intensity", "Debris Damage Intensity" -> "%";
             case "Screen flash" -> "%";
             case "Camera shake" -> "%";
-            case "Hitlag frames" -> " frames";
             case "Mob gear chance" -> "%";
             case "Mob guard difficulty" -> "%";
             case "Any held item" -> "";
@@ -976,13 +1072,17 @@ public final class GuardConfigScreen extends Screen {
     }
 
     void choice(String name, String[] options, java.util.function.IntSupplier current, java.util.function.IntConsumer change, String description) {
+        choice(name,options,current,change,description,true);
+    }
+    void choice(String name, String[] options, java.util.function.IntSupplier current, java.util.function.IntConsumer change, String description,boolean server) {
         int position=controlIndex++;visibleSettingRows.putIfAbsent(name,position);if(!visible(position))return;
         trackValue(position,()->options[current.getAsInt()]);
-        if(operator)rowUndo(position,true,()->{String old=originalRows.get(position);for(int i=0;i<options.length;i++)if(options[i].equals(old)){change.accept(i);break;}});
-        settingLabel(position,name,scope(true,description),operator);
+        if(editable(server))rowUndo(position,server,()->{String old=originalRows.get(position);for(int i=0;i<options.length;i++)if(options[i].equals(old)){change.accept(i);break;}});
+        settingLabel(position,name,scope(server,description),editable(server));
         Button button=addRenderableWidget(GuardUi.builder(Component.literal(options[current.getAsInt()]),b->{
-            dirty=true;dirtyServer=true;dirtyServerRules=true;change.accept((current.getAsInt()+1)%options.length);b.setMessage(Component.literal(options[current.getAsInt()]));
-        }).bounds(settingX(),row(position),settingWidth(),20).build());button.active=operator;tip(button,scope(true,description));
+            dirty=true;if(server){dirtyServer=true;if(enforceSection)dirtyPolicy=true;else dirtyServerRules=true;}else dirtyClient=true;
+            change.accept((current.getAsInt()+1)%options.length);b.setMessage(Component.literal(options[current.getAsInt()]));
+        }).bounds(settingX(),row(position),settingWidth(),20).build());button.active=editable(server);tip(button,scope(server,description));
     }
 
     void toggle(Control control, String name, BooleanSupplier current,
@@ -996,13 +1096,15 @@ public final class GuardConfigScreen extends Screen {
         int position = controlIndex++;
         visibleSettingRows.putIfAbsent(name, position);
         if (!visible(position)) return;
-        trackValue(position,()->current.getAsBoolean()?"On":"Off");
+        trackValue(position,()->GuardUi.enabledLabel(current.getAsBoolean()));
         var binding = controlBindings.get(name);
+        String defaultValue=defaultText(name,server);
+        if(binding!=null&&binding.defaultValue() instanceof Number number&&binding.minimum()==0&&binding.maximum()==1)defaultValue=GuardUi.enabledLabel(number.intValue()!=0);
         String tooltip = binding == null
-            ? scope(server, description + (description.contains("Default:") ? "" : " Default: " + defaultText(name, server) + "."))
-            : scope(server, description.replaceAll("\\s*Default:[^.]*(?:\\.(?!\\d)|$)", "").trim() + " Default: " + defaultText(name, server) + ".");
+            ? scope(server, description + (description.contains("Default:") ? "" : " Default: " + defaultValue + "."))
+            : scope(server, description.replaceAll("\\s*Default:[^.]*(?:\\.(?!\\d)|$)", "").trim() + " Default: " + defaultValue + ".");
         settingLabel(position, name, tooltip, editable(server));
-        if(editable(server))rowUndo(position,server,()->change.accept("On".equals(originalRows.get(position))));
+        if(editable(server))rowUndo(position,server,()->change.accept("Enabled".equals(originalRows.get(position))));
         boolean damageToggle = server && !enforceSection && page == 6;
         Button button = addRenderableWidget(GuardUi.builder(damageToggle ? damageStatus(current.getAsBoolean()) : label(current.getAsBoolean()), b -> {
             dirty = true;
@@ -1012,6 +1114,7 @@ public final class GuardConfigScreen extends Screen {
             } else dirtyClient = true;
             change.accept(!current.getAsBoolean());
             b.setMessage(damageToggle ? damageStatus(current.getAsBoolean()) : label(current.getAsBoolean()));
+            rebuildWidgets();
         }).bounds(settingX(), row(position), settingWidth(), 20).build());
         boolean automaticPose = !server && binding != null && binding.setting() == GuardConfig.FIRST_PERSON_ANIMATION
             && (!PunchyGuardCompat.installed() || configDraft.extraClient[65] != 0);
@@ -1090,11 +1193,12 @@ public final class GuardConfigScreen extends Screen {
     }
 
     void blockCountAssignments(){
-        String name="Item Block Counts",description="Assign a block limit to individual items.\nOverrides compatibility and ordinary limits; 0 is unlimited.";
+        String name="Item Assignments",description="Assign allowed/blocked items and individual block limits.\nLeft: allow; right: block; either click again removes. 0 blocks is unlimited.";
         int position=controlIndex++;visibleSettingRows.putIfAbsent(name,position);if(!visible(position))return;
         settingLabel(position,name,scope(true,description),editable(true));
-        rowValues.put(position,()->configDraft.itemBlockCounts);originalRows.put(position,originalText(name,configDraft.itemBlockCounts));
-        if(editable(true))rowUndo(position,true,()->configDraft.itemBlockCounts=originalRows.get(position));
+        String oldAllowed=originalText("Item Whitelist",configDraft.includedItems),oldBlocked=originalText("Item Blacklist",configDraft.excludedItems),oldCounts=originalText("Item Block Counts",configDraft.itemBlockCounts);
+        rowValues.put(position,()->configDraft.includedItems+" | "+configDraft.excludedItems+" | "+configDraft.itemBlockCounts);originalRows.put(position,oldAllowed+" | "+oldBlocked+" | "+oldCounts);
+        if(editable(true))rowUndo(position,true,()->{configDraft.includedItems=oldAllowed;configDraft.excludedItems=oldBlocked;configDraft.itemBlockCounts=oldCounts;dirtyServerRules=dirtyShield=true;});
         Button button=addRenderableWidget(GuardUi.button("Assign Items",settingX(),row(position),settingWidth(),20,()->Minecraft.getInstance().setScreen(new GuardPoseItemScreen(this,"Item Assignments",configDraft.includedItems,configDraft.excludedItems,configDraft.itemBlockCounts,result->{
             if(!result.whitelist().equals(configDraft.includedItems)||!result.blacklist().equals(configDraft.excludedItems)){configDraft.includedItems=result.whitelist();configDraft.excludedItems=result.blacklist();dirtyServerRules=true;}
             if(!result.blockCounts().equals(configDraft.itemBlockCounts)){configDraft.itemBlockCounts=result.blockCounts();dirtyShield=true;}
@@ -1178,7 +1282,7 @@ public final class GuardConfigScreen extends Screen {
     }
 
     private static Component label(boolean value) {
-        return Component.literal(value ? "On" : "Off");
+        return Component.literal(GuardUi.enabledLabel(value));
     }
 
     public void refreshPolicy() {
@@ -1191,11 +1295,12 @@ public final class GuardConfigScreen extends Screen {
         if(GuardClient.clientCategoryLocked(GuardClientPreset.HUD)){configDraft.hud=GuardConfig.HUD.get();configDraft.shieldEffects=GuardConfig.SHIELD_EFFECTS.get();}
         if(GuardClient.clientCategoryLocked(GuardClientPreset.ANIMATIONS)){configDraft.firstPersonAnimation=GuardConfig.FIRST_PERSON_ANIMATION.get();configDraft.thirdPersonAnimation=GuardConfig.THIRD_PERSON_ANIMATION.get();}
         if (GuardClient.clientCategoryLocked(GuardClientPreset.SCREEN)) {
+            configDraft.extraClient[2]=effectiveClient[2];
             configDraft.memeFlash = GuardConfig.MEME_FLASH.get();
-            configDraft.flashStrength = GuardConfig.SCREEN_FLASH.get() ? GuardConfig.FLASH_STRENGTH.get() : 0;
+            configDraft.flashStrength=GuardConfig.FLASH_STRENGTH.get();
             configDraft.perfectOnlyFlash = GuardConfig.PERFECT_ONLY_FLASH.get();
-            configDraft.shakeStrength = GuardConfig.SCREEN_SHAKE.get() ? GuardConfig.SHAKE_STRENGTH.get() : 0;
-            configDraft.hitlagFrames = GuardConfig.HITLAG_FRAMES.get();
+            configDraft.shakeStrength=GuardConfig.SHAKE_STRENGTH.get();
+            configDraft.hitlagTicks = GuardConfig.HITLAG_TICKS.get();
             configDraft.impactFrames = GuardConfig.IMPACT_FRAMES.get();
             configDraft.impactPerfectOnly = GuardConfig.IMPACT_PERFECT_ONLY.get();
             configDraft.impactBrightness = GuardConfig.IMPACT_BRIGHTNESS.get(); configDraft.impactContrast = GuardConfig.IMPACT_CONTRAST.get();
@@ -1206,9 +1311,7 @@ public final class GuardConfigScreen extends Screen {
             configDraft.parryVolume = GuardConfig.LOCAL_PARRY_VOLUME.get(); configDraft.blockVolume = GuardConfig.LOCAL_BLOCK_VOLUME.get();
         }
         if (GuardClient.clientCategoryLocked(GuardClientPreset.PUNCHY)) {
-            int[] current = GuardClientPreset.readLocal();
-            System.arraycopy(current, 65, configDraft.extraClient, 65, GuardShieldReactions.OFFSET - 65);
-            System.arraycopy(current,GuardPoseSettings.RELEASE_DELAY_SLOT,configDraft.extraClient,GuardPoseSettings.RELEASE_DELAY_SLOT,current.length-GuardPoseSettings.RELEASE_DELAY_SLOT);
+            for(int i=0;i<configDraft.extraClient.length;i++)if(GuardClientPreset.categoryOf(i)==GuardClientPreset.PUNCHY)configDraft.extraClient[i]=effectiveClient[i];
         }
         acceptReceivedValues(before);
         rebuildWidgets();
@@ -1216,7 +1319,7 @@ public final class GuardConfigScreen extends Screen {
 
     /** Reset values in memory; Apply is still required to commit. */
     private void reset(boolean wholeSection) {
-        if(debugSection&&page==18){configDraft.debugFlags=0;dirty=dirtyClient=true;rebuildWidgets();return;}
+        if(page==18){configDraft.debugFlags=0;dirty=dirtyClient=true;rebuildWidgets();return;}
         if ((enforceSection || !clientSection && !experimentalSection) && !operator) return;
         if (enforceSection) {
             configDraft.enforceEnabled = false;
@@ -1230,6 +1333,7 @@ public final class GuardConfigScreen extends Screen {
             } else if (!GuardClient.clientCategoryLocked(categoryMask(page))) resetClientPage(page);
         } else if (experimentalSection) {
             if ((wholeSection || page == 14) && !GuardClient.clientCategoryLocked(GuardClientPreset.PUNCHY)) resetClientPage(14);
+            if((wholeSection||page==24)&&!GuardClient.clientCategoryLocked(GuardClientPreset.SCREEN))resetClientPage(24);
             if (operator) {
                 GuardPackets.Settings defaults = GuardConfig.defaultSnapshot(true);
                 if (wholeSection) for (int category : EXPERIMENTAL_PAGES) resetServerPage(category, defaults);
@@ -1243,10 +1347,14 @@ public final class GuardConfigScreen extends Screen {
         rebuildWidgets();
     }
 
+    private static boolean highlightSlot(int i){
+        return i==GuardScreenSettings.HIGHLIGHT_ENABLED||i==GuardScreenSettings.HIGHLIGHT_DIM||i==GuardScreenSettings.HIGHLIGHT_GLOW||i==GuardScreenSettings.HIGHLIGHT_FADE||i==GuardScreenSettings.HIGHLIGHT_DURATION
+            ||i>=GuardScreenSettings.HIGHLIGHT_FADE_OUT&&i<=GuardScreenSettings.HIGHLIGHT_TARGET_COLOR||i==GuardScreenSettings.HIGHLIGHT_ATTACKER_ENABLED||i==GuardScreenSettings.HIGHLIGHT_TARGET_ENABLED;
+    }
     private int categoryMask(int category) {
         return switch (category) {
             case 7 -> GuardClientPreset.PARTICLES;
-            case 2->GuardClientPreset.SCREEN;
+            case 2,24->GuardClientPreset.SCREEN;
             case 15->GuardClientPreset.ANIMATIONS;
             case 17->GuardClientPreset.HUD;
             case 14 -> GuardClientPreset.PUNCHY;
@@ -1257,15 +1365,16 @@ public final class GuardConfigScreen extends Screen {
 
     private void resetClientPage(int category) {
         int[] values = GuardClientPreset.DEFAULTS;
-        for(int i=50;i<configDraft.extraClient.length;i++)if(category==17?GuardClientPreset.categoryOf(i)==GuardClientPreset.HUD:category==2?i<65&&GuardClientPreset.categoryOf(i)==GuardClientPreset.SCREEN:category==7?GuardClientPreset.categoryOf(i)==GuardClientPreset.PARTICLES:false)configDraft.extraClient[i]=values[i];
+        for(int i=50;i<configDraft.extraClient.length;i++)if(category==17?GuardClientPreset.categoryOf(i)==GuardClientPreset.HUD:category==2?GuardClientPreset.categoryOf(i)==GuardClientPreset.SCREEN&&!highlightSlot(i):category==24?highlightSlot(i):false)configDraft.extraClient[i]=values[i];
         switch (category) {
             case 7 -> {
                 for(int i=0;i<configDraft.extraClient.length;i++)if(GuardClientPreset.categoryOf(i)==GuardClientPreset.PARTICLES)configDraft.extraClient[i]=values[i];
                 }
             case 2 -> {
+                configDraft.extraClient[2]=values[2];
                 configDraft.memeFlash = values[24] != 0;
                 configDraft.flashStrength = values[4]; configDraft.shakeStrength = values[5];
-                configDraft.hitlagFrames = values[3];
+                configDraft.hitlagTicks = values[3];
                 configDraft.perfectOnlyFlash = values[27] != 0;
                 configDraft.impactFrames = values[34]; configDraft.impactPerfectOnly = values[35] != 0;
                 configDraft.impactBrightness = values[40]; configDraft.impactContrast = values[41];
@@ -1282,6 +1391,7 @@ public final class GuardConfigScreen extends Screen {
                     for(int i=0;i<GuardPoseSettings.COUNT;i++)poseDraft.poses.add(dev.zeli.mallardguard.GuardPoseLibrary.preset(i));
                 }
             }
+            case 24 -> {}
             case 4 -> {}
             default -> { return; }
         }
@@ -1300,7 +1410,8 @@ public final class GuardConfigScreen extends Screen {
                 configDraft.parryProjectiles = d.parryProjectiles(); configDraft.parryExplosions = d.parryExplosions();
                 configDraft.perfectExplosionsOnly = d.perfectExplosionsOnly();
                 GuardPackets.ShieldSettings shieldDefaults = GuardConfig.defaultShieldSnapshot();
-                configDraft.shieldRegularPush = shieldDefaults.regularPushback(); configDraft.toolPush = shieldDefaults.weaponPushback();
+                configDraft.retaliationEnabled=shieldDefaults.retaliationEnabled();configDraft.perfectProjectilesOnly=shieldDefaults.perfectProjectilesOnly();configDraft.perfectFallOnly=shieldDefaults.perfectFallOnly();configDraft.perfectKnockbackMultiplier=shieldDefaults.perfectKnockbackMultiplier();configDraft.incomingReaction=shieldDefaults.incomingReaction();configDraft.parriedEnabled=shieldDefaults.parriedEnabled();configDraft.parriedGuardBreakTicks=shieldDefaults.parriedGuardBreakTicks();configDraft.parriedStunTicks=shieldDefaults.parriedStunTicks();
+                configDraft.toolPush = shieldDefaults.weaponPushback();
                 dirtyShield = true;
             }
             case 1 -> {
@@ -1322,18 +1433,23 @@ public final class GuardConfigScreen extends Screen {
                 dirtyShield = true;
                 configDraft.parryWear = d.parryWear(); configDraft.perfectWear = d.perfectWear(); configDraft.blockWear = d.blockWear();
                 configDraft.includedItems = d.includedItems(); configDraft.excludedItems = d.excludedItems();
+                configDraft.itemBlockCounts=hands.itemBlockCounts();
             }
             case 5 -> {
-                configDraft.fallParry = d.fallParry(); configDraft.fallPerfectParry = d.fallPerfectParry(); configDraft.fallLookDown = d.fallLookDown();
+                configDraft.fallParry = d.fallParry();
                 configDraft.fallBreakBlocks = d.fallBreakBlocks(); configDraft.fallBlastStrength = d.fallBlastStrength();
                 configDraft.fallLaunchPower = d.fallLaunchPower();
             }
             case 6 -> { configDraft.damageRules.clear(); dirtyDamageRules = true; }
             case 11 -> {
-                int regularPush = configDraft.shieldRegularPush, weaponPush = configDraft.toolPush, weaponBlocks = configDraft.toolMaxBlocks, sharedBreak = configDraft.shieldBreakTicks, sharedCap = configDraft.retaliationCap;
+                int weaponPush = configDraft.toolPush, weaponBlocks = configDraft.toolMaxBlocks, sharedBreak = configDraft.shieldBreakTicks, sharedCap = configDraft.retaliationCap;
                 int handRule=configDraft.parryHandPriority, shieldRule=configDraft.shieldParryPriority; boolean crouchRule=configDraft.forceCrouchOffhand, cooldownRule=configDraft.cooldownPreventsGuard, emptyRule=configDraft.allowEmptyHand, foodRule=configDraft.consumablePriority;
+                String assignedCounts=configDraft.itemBlockCounts;boolean incoming=configDraft.parriedEnabled;int reaction=configDraft.incomingReaction,regularStun=configDraft.parriedGuardBreakTicks,perfectStun=configDraft.parriedStunTicks;
+                boolean returnEnabled=configDraft.retaliationEnabled,projectileOnly=configDraft.perfectProjectilesOnly,fallOnly=configDraft.perfectFallOnly;int perfectPush=configDraft.perfectKnockbackMultiplier;
                 setShieldSettings(GuardConfig.defaultShieldSnapshot());
-                configDraft.shieldRegularPush = regularPush; configDraft.toolPush = weaponPush; configDraft.toolMaxBlocks = weaponBlocks; configDraft.shieldBreakTicks = sharedBreak; configDraft.retaliationCap = sharedCap;
+                configDraft.retaliationEnabled=returnEnabled;configDraft.perfectProjectilesOnly=projectileOnly;configDraft.perfectFallOnly=fallOnly;configDraft.perfectKnockbackMultiplier=perfectPush;
+                configDraft.itemBlockCounts=assignedCounts;configDraft.incomingReaction=reaction;configDraft.parriedEnabled=incoming;configDraft.parriedGuardBreakTicks=regularStun;configDraft.parriedStunTicks=perfectStun;
+                configDraft.toolPush = weaponPush; configDraft.toolMaxBlocks = weaponBlocks; configDraft.shieldBreakTicks = sharedBreak; configDraft.retaliationCap = sharedCap;
                 configDraft.parryHandPriority=handRule;configDraft.shieldParryPriority=shieldRule;configDraft.forceCrouchOffhand=crouchRule;configDraft.cooldownPreventsGuard=cooldownRule; configDraft.allowEmptyHand = emptyRule; configDraft.consumablePriority = foodRule;
                 configDraft.shieldItems = d.shieldItems(); configDraft.shieldBlacklist=GuardConfig.SHIELD_BLACKLIST.getDefault(); dirtyShield = true;
             }
@@ -1374,8 +1490,8 @@ public final class GuardConfigScreen extends Screen {
             int[] clientValues = configDraft.extraClient.clone();
             clientValues[0] = (configDraft.hud) ? 1 : 0;
             clientValues[1] = (configDraft.shieldEffects) ? 1 : 0;
-            clientValues[2] = (configDraft.flashStrength > 0) ? 1 : 0;
-            clientValues[3] = configDraft.hitlagFrames;
+            clientValues[2]=configDraft.extraClient[2];
+            clientValues[3] = configDraft.hitlagTicks;
             clientValues[4] = configDraft.flashStrength;
             clientValues[5] = configDraft.shakeStrength;
             clientValues[11] = configDraft.firstPersonAnimation ? 1 : 0;
@@ -1426,13 +1542,13 @@ public final class GuardConfigScreen extends Screen {
             org.slf4j.LoggerFactory.getLogger("MallardGuard").warn("Client config save failed",error);
             return;
         }
-        GuardPackets.Save rulesSave = operator && dirtyServerRules ? new GuardPackets.Save(configDraft.parry, configDraft.block, configDraft.parryDrowningFire, configDraft.parryStarvation, configDraft.parryGenericKill, configDraft.perfect, configDraft.window, configDraft.recharge, configDraft.angle, configDraft.reductionPercent, configDraft.followUp, configDraft.parryReturnPercent, configDraft.perfectReturnPercent, configDraft.parryWear, configDraft.perfectWear, configDraft.blockWear, configDraft.serverHitSounds, configDraft.hitParticles, configDraft.serverMasterVolume, configDraft.serverPerfectVolume, configDraft.serverParryVolume, configDraft.serverBlockVolume, configDraft.fallParry, configDraft.fallPerfectParry, configDraft.fallLookDown, configDraft.fallBreakBlocks, configDraft.fallBlastStrength, configDraft.fallLaunchPower, configDraft.parryExplosions, configDraft.perfectExplosionsOnly, configDraft.blockExplosions, configDraft.parryProjectiles, configDraft.blockProjectiles, configDraft.knockbackStrength > 0, configDraft.knockbackStrength, configDraft.guardMovementPercent, configDraft.blockDeflectChance, configDraft.allowAnyItem, configDraft.allowUsableItems, configDraft.includedItems, configDraft.excludedItems, configDraft.shieldItems, configDraft.consumablePriority, configDraft.parryHealing, configDraft.parryHealingHearts) : null;
+        GuardPackets.Save rulesSave = operator && dirtyServerRules ? new GuardPackets.Save(configDraft.parry, configDraft.block, configDraft.parryDrowningFire, configDraft.parryStarvation, configDraft.parryGenericKill, configDraft.perfect, configDraft.window, configDraft.recharge, configDraft.angle, configDraft.reductionPercent, configDraft.followUp, configDraft.parryReturnPercent, configDraft.perfectReturnPercent, configDraft.parryWear, configDraft.perfectWear, configDraft.blockWear, configDraft.serverHitSounds, configDraft.hitParticles, configDraft.serverMasterVolume, configDraft.serverPerfectVolume, configDraft.serverParryVolume, configDraft.serverBlockVolume, configDraft.fallParry, true, true, configDraft.fallBreakBlocks, configDraft.fallBlastStrength, configDraft.fallLaunchPower, configDraft.parryExplosions, configDraft.perfectExplosionsOnly, configDraft.blockExplosions, configDraft.parryProjectiles, configDraft.blockProjectiles, configDraft.knockbackStrength > 0, configDraft.knockbackStrength, configDraft.guardMovementPercent, configDraft.blockDeflectChance, configDraft.allowAnyItem, configDraft.allowUsableItems, configDraft.includedItems, configDraft.excludedItems, configDraft.shieldItems, configDraft.consumablePriority, configDraft.parryHealing, configDraft.parryHealingHearts) : null;
         GuardPackets.SaveMobs mobsSave = operator && dirtyMobs ? new GuardPackets.SaveMobs(new GuardPackets.MobSettings(
             configDraft.mobGuard,configDraft.mobDifficulty,configDraft.mobWhitelist,configDraft.mobGearChance,configDraft.mobGearWhitelist,configDraft.mobGearBlacklist,configDraft.mobTracerStartColor,configDraft.mobTracerMiddleColor,configDraft.mobTracerEndColor)) : null;
         if (operator && dirtyShield) configDraft.shieldBreakTicks = Math.max(configDraft.recharge, configDraft.shieldBreakTicks);
         GuardPackets.SaveShield shieldSave = operator && dirtyShield ? new GuardPackets.SaveShield(new GuardPackets.ShieldSettings(
             configDraft.shieldPerfect, configDraft.shieldWindow, configDraft.shieldRechargeTicks, configDraft.shieldMaxBlocks, configDraft.toolMaxBlocks, Math.max(configDraft.recharge, configDraft.shieldBreakTicks), configDraft.shieldCone, configDraft.shieldReach, configDraft.shieldReturn,
-            configDraft.shieldStun, configDraft.shieldPerfectPush, configDraft.shieldRegularPush, configDraft.toolPush, configDraft.stunnableBosses, configDraft.consumablePriority, configDraft.cooldownPreventsGuard, configDraft.allowEmptyHand, configDraft.retaliationCap, configDraft.shieldParryPriority, configDraft.parryHandPriority, configDraft.forceCrouchOffhand, configDraft.shieldBlacklist, configDraft.itemBlockCounts, GuardClient.currentShieldSettings().shieldExpansionActive())) : null;
+            configDraft.shieldStun, configDraft.shieldPerfectPush, configDraft.shieldRegularPush, configDraft.toolPush, configDraft.stunnableBosses, configDraft.consumablePriority, configDraft.cooldownPreventsGuard, configDraft.allowEmptyHand, configDraft.retaliationCap, configDraft.shieldParryPriority, configDraft.parryHandPriority, configDraft.forceCrouchOffhand, configDraft.shieldBlacklist, configDraft.itemBlockCounts, GuardClient.currentShieldSettings().shieldExpansionActive(),configDraft.parriedEnabled,configDraft.parriedGuardBreakTicks,configDraft.parriedStunTicks,configDraft.shieldConeEnabled,configDraft.incomingReaction,configDraft.retaliationEnabled,configDraft.perfectProjectilesOnly,configDraft.perfectFallOnly,configDraft.perfectKnockbackMultiplier)) : null;
         GuardPackets.SaveDamageRules damageSave = operator && dirtyDamageRules ? new GuardPackets.SaveDamageRules(
             GuardDamageRules.encodeRules(configDraft.damageRules)) : null;
         GuardPackets.SaveClientPolicy policySave = operator && dirtyPolicy ? new GuardPackets.SaveClientPolicy(configDraft.enforceEnabled, configDraft.dontEnforceMask,
@@ -1480,15 +1596,15 @@ public final class GuardConfigScreen extends Screen {
         for (DropdownLabel dropdown : dropdownLabels) {
             boolean hover = mouseX >= panelLeft && mouseX < contentRight()
                 && mouseY >= dropdown.y() && mouseY < dropdown.y() + 22;
-            if (hover || dropdown.expanded().getAsBoolean()) graphics.fill(panelLeft, dropdown.y(), contentRight(), dropdown.y() + 22,
+            if (dropdown.enabled()&&(hover || dropdown.expanded().getAsBoolean())) graphics.fill(panelLeft, dropdown.y(), contentRight(), dropdown.y() + 22,
                 hover ? 0x88493E55 : 0x49493E55);
-            if (dropdown.expanded().getAsBoolean()) graphics.fill(panelLeft, dropdown.y(), panelLeft + 2, dropdown.y() + 22, WARM_EDGE);
-            int dropdownColor = enforceSection && !configDraft.enforceEnabled ? 0xFF888888 : WARM_EDGE;
+            if (dropdown.enabled()&&dropdown.expanded().getAsBoolean()) graphics.fill(panelLeft, dropdown.y(), panelLeft + 2, dropdown.y() + 22, WARM_EDGE);
+            int dropdownColor = !dropdown.enabled() ? 0xFF888888 : WARM_EDGE;
             int titleRight=contentRight()-18;for(Button control:themedButtons)if(control.visible&&control.getX()>=panelLeft&&control.getY()==dropdown.y())titleRight=Math.min(titleRight,control.getX()-4);
             graphics.drawString(font,font.plainSubstrByWidth(dropdown.name(),Math.max(0,titleRight-panelLeft-4)),panelLeft+4,dropdown.y()+3,dropdownColor);
             int lineEnd=contentRight()-4;for(Button control:themedButtons)if(control.visible&&control.getX()>=panelLeft&&control.getY()==dropdown.y())lineEnd=Math.min(lineEnd,control.getX()-4);
             graphics.fill(panelLeft + 4, dropdown.y() + 18, lineEnd,
-                dropdown.y() + 19, enforceSection && !configDraft.enforceEnabled ? 0x88777777 : GuardUi.WARM);
+                dropdown.y() + 19, !dropdown.enabled() ? 0x88777777 : GuardUi.WARM);
             GuardUi.chevron(graphics,contentRight()-GuardUiLayout.ARROW_SIZE-GuardUiLayout.CONTROL_GAP,
                 dropdown.y()+(22-GuardUiLayout.ARROW_SIZE)/2,dropdown.expanded().getAsBoolean()?1:0,dropdownColor);
         }
@@ -1512,7 +1628,7 @@ public final class GuardConfigScreen extends Screen {
         graphics.fill(dividerX,layoutTop-5+GuardUiLayout.DIVIDER_INSET,dividerX+1,
             height-5-GuardUiLayout.DIVIDER_INSET,GuardUiLayout.DIVIDER_COLOR);
         if (settingsSearch.isBlank()) {
-            int[] categories = debugSection ? DEBUG_PAGES : enforceSection ? ENFORCE_PAGES : clientSection ? CLIENT_PAGES : experimentalSection ? EXPERIMENTAL_PAGES : SERVER_PAGES;
+            int[] categories = enforceSection ? ENFORCE_PAGES : clientSection ? CLIENT_PAGES : experimentalSection ? EXPERIMENTAL_PAGES : SERVER_PAGES;
             for (int i = sidebarOffset; i < Math.min(categories.length, sidebarOffset + visibleSidebarTabs(categories.length)); i++) {
                 if (page == categories[i]) graphics.fill(sidebarLeft + 2, sidebarTop() + (i - sidebarOffset) * sidebarStep(categories.length) + 3,
                     sidebarLeft + 5, sidebarTop() + (i - sidebarOffset) * sidebarStep(categories.length) + sidebarStep(categories.length)-4, GuardUi.WARM);
@@ -1599,15 +1715,13 @@ public final class GuardConfigScreen extends Screen {
         if (experimentalSection) { experimentalPage = page; experimentalRow = firstRow; }
         else if (enforceSection) {enforceRow=firstRow;enforcePage=page;}
         else if (clientSection) { clientPage = page; clientRow = firstRow; }
-        else if(debugSection){debugPage=page;}
         else { serverPage = page; serverRow = firstRow; }
-        debugSection = section == 4;
         experimentalSection = section == 3;
         enforceSection = section == 2;
         clientSection = section == 0;
-        page = debugSection ? debugPage : experimentalSection ? experimentalPage : enforceSection ? enforcePage : clientSection ? clientPage : serverPage;
+        page = experimentalSection ? experimentalPage : enforceSection ? enforcePage : clientSection ? clientPage : serverPage;
         if (!enforceSection) {
-            int[] categories = debugSection ? DEBUG_PAGES : enforceSection ? ENFORCE_PAGES : clientSection ? CLIENT_PAGES : experimentalSection ? EXPERIMENTAL_PAGES : SERVER_PAGES;
+            int[] categories = enforceSection ? ENFORCE_PAGES : clientSection ? CLIENT_PAGES : experimentalSection ? EXPERIMENTAL_PAGES : SERVER_PAGES;
             sidebarOffset = 0;
             for (int i = 0; i < categories.length; i++) if (categories[i] == page) {
                 sidebarOffset = Math.max(0, i - visibleSidebarTabs(categories.length) + 1);
@@ -1646,6 +1760,7 @@ public final class GuardConfigScreen extends Screen {
             for (DropdownLabel dropdown : dropdownLabels) {
                 if (mouseY >= dropdown.y() && mouseY < dropdown.y() + 22) {
                     for(Button control:themedButtons)if(control.active&&control.isMouseOver(mouseX,mouseY))return super.mouseClicked(mouseX,mouseY,button);
+                    if(!dropdown.enabled())return true;
                     if(java.util.Arrays.asList(GuardShieldReactions.NAMES).contains(dropdown.name()))reactionGroup=dropdown.expanded().getAsBoolean()?"":dropdown.name();
                     else rememberedGroups.put(groupKey(), dropdown.expanded().getAsBoolean() ? "" : dropdown.name());
                     selectRememberedGroup();
@@ -1693,7 +1808,7 @@ public final class GuardConfigScreen extends Screen {
     }
 
     private record SettingLabel(String name, String description, int y, boolean enabled) {}
-    private record DropdownLabel(String name, int y, BooleanSupplier expanded, String description) {}
+    private record DropdownLabel(String name, int y, BooleanSupplier expanded, String description,boolean enabled) {}
 
     @Override public void removed(){draggingScroll=false;super.removed();}
 

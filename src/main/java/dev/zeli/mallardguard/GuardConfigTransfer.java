@@ -10,13 +10,26 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.connection.ConnectionType;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /** Bounded config uploads/snapshots with timeout and disconnect cleanup. */
 public final class GuardConfigTransfer {
     private GuardConfigTransfer() {}
     static final int SAVE_CHUNK_BYTES=24_000, MAX_SAVE_BYTES=2_097_152;
+    private static final int MAX_DECODED_BYTES=33_554_432;
     private static final long UPLOAD_TIMEOUT=15_000_000_000L;
+
+    /** Limit both wire size and inflated size; no unbounded compressed payload allocation. */
+    private static byte[] compress(RegistryFriendlyByteBuf buf){
+        int size=buf.readableBytes();if(size>MAX_DECODED_BYTES)throw new IllegalArgumentException("Config exceeds the saved-data size limit.");
+        byte[] data=new byte[size];buf.readBytes(data);var codec=new java.util.zip.Deflater();
+        try{codec.setInput(data);codec.finish();var output=new java.io.ByteArrayOutputStream(Math.min(size,SAVE_CHUNK_BYTES));byte[] chunk=new byte[SAVE_CHUNK_BYTES];while(!codec.finished()){int count=codec.deflate(chunk);if(output.size()+count>MAX_SAVE_BYTES)throw new IllegalArgumentException("Config exceeds the transfer size limit.");output.write(chunk,0,count);}return output.toByteArray();}finally{codec.end();}
+    }
+    private static byte[] decompress(byte[] data){
+        var codec=new java.util.zip.Inflater();
+        try{codec.setInput(data);var output=new java.io.ByteArrayOutputStream(SAVE_CHUNK_BYTES);byte[] chunk=new byte[SAVE_CHUNK_BYTES];while(!codec.finished()){int count=codec.inflate(chunk);if(output.size()+count>MAX_DECODED_BYTES)throw new IllegalArgumentException("Inflated config is too large.");if(count==0&&!codec.finished())throw new IllegalArgumentException("Incomplete compressed config.");output.write(chunk,0,count);}if(codec.getRemaining()!=0)throw new IllegalArgumentException("Trailing compressed config data.");return output.toByteArray();}catch(java.util.zip.DataFormatException error){throw new IllegalArgumentException("Invalid compressed config.",error);}finally{codec.end();}
+    }
 
     private static final class Upload {
         final int request;final byte[][] parts;int next,size;long touched;
@@ -30,15 +43,15 @@ public final class GuardConfigTransfer {
     private static final java.util.Map<java.util.UUID,Upload> UPLOADS=new java.util.HashMap<>();
     public static void expireUploads(){if(UPLOADS.isEmpty())return;long now=System.nanoTime();UPLOADS.values().removeIf(upload->now-upload.touched>UPLOAD_TIMEOUT);}
     public static void forgetUpload(java.util.UUID player){UPLOADS.remove(player);}
-    public static void clearUploads(){UPLOADS.clear();}
+    public static void clearUploads(){UPLOADS.clear();cachedSnapshot=null;cachedSnapshotBytes=null;}
     public static void sendConfig(SaveConfig request,net.minecraft.core.RegistryAccess registries){
-        RegistryFriendlyByteBuf buf=new RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.buffer(),registries);
+        RegistryFriendlyByteBuf buf=new RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.buffer(),registries,ConnectionType.NEOFORGE);
         try{
-            SaveConfig.CODEC.encode(buf,request);int size=buf.readableBytes();
+            SaveConfig.CODEC.encode(buf,request);byte[] packed=compress(buf);int size=packed.length;
             if(size>MAX_SAVE_BYTES)throw new IllegalArgumentException("Config save is too large.");
             int total=(size+SAVE_CHUNK_BYTES-1)/SAVE_CHUNK_BYTES;
-            for(int index=0;index<total;index++){byte[] bytes=new byte[Math.min(SAVE_CHUNK_BYTES,buf.readableBytes())];buf.readBytes(bytes);PacketDistributor.sendToServer(new SaveChunk(request.request(),total,index,bytes));}
-        }finally{buf.release();}
+            for(int index=0;index<total;index++){byte[] bytes=java.util.Arrays.copyOfRange(packed,index*SAVE_CHUNK_BYTES,Math.min(size,(index+1)*SAVE_CHUNK_BYTES));PacketDistributor.sendToServer(new SaveChunk(request.request(),total,index,bytes));}
+        }finally{if(buf!=null)buf.release();}
     }
     static void saveChunk(SaveChunk chunk,IPayloadContext context){
         if(!(context.player() instanceof ServerPlayer player))return;
@@ -49,10 +62,10 @@ public final class GuardConfigTransfer {
         Upload upload=UPLOADS.get(id);
         if(upload==null||!upload.append(chunk)){UPLOADS.remove(id);PacketDistributor.sendToPlayer(player,new SaveResult(chunk.request(),0,"Config upload was incomplete. Try again."));return;}
         byte[] data=upload.complete();if(data==null)return;UPLOADS.remove(id);
-        RegistryFriendlyByteBuf buf=new RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(data),player.registryAccess());
-        try{SaveConfig request=SaveConfig.CODEC.decode(buf);if(buf.readableBytes()!=0||request.request()!=chunk.request())throw new IllegalArgumentException("Invalid config upload.");GuardPackets.saveConfig(request,context);}
+        RegistryFriendlyByteBuf buf=null;
+        try{buf=new RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(decompress(data)),player.registryAccess(),ConnectionType.NEOFORGE);SaveConfig request=SaveConfig.CODEC.decode(buf);if(buf.readableBytes()!=0||request.request()!=chunk.request())throw new IllegalArgumentException("Invalid config upload.");GuardPackets.saveConfig(request,context);}
         catch(RuntimeException error){PacketDistributor.sendToPlayer(player,new SaveResult(chunk.request(),0,"Could not read config upload. Try again."));}
-        finally{buf.release();}
+        finally{if(buf!=null)buf.release();}
     }
     /** Bounded snapshots use the same small transport size in both directions. */
     record ConfigSnapshot(Settings rules,MobSettings mobs,ShieldSettings shield,DamageState damage,ClientPolicy policy) {
@@ -61,21 +74,25 @@ public final class GuardConfigTransfer {
             buf->new ConfigSnapshot(readOptional(buf,Settings.CODEC),readOptional(buf,MobSettings.CODEC),readOptional(buf,ShieldSettings.CODEC),readOptional(buf,DamageState.CODEC),readOptional(buf,ClientPolicy.CODEC)));
     }
 
+    private static ConfigSnapshot cachedSnapshot;
+    private static byte[] cachedSnapshotBytes;
     private static int nextSnapshot;
     private static Upload clientSnapshot;
     public static void clearClientSnapshot(){clientSnapshot=null;}
     public static void expireClientSnapshot(){if(clientSnapshot!=null&&System.nanoTime()-clientSnapshot.touched>UPLOAD_TIMEOUT)clearClientSnapshot();}
     static void sendSnapshot(ServerPlayer player,ConfigSnapshot snapshot) {
-        RegistryFriendlyByteBuf buf=new RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.buffer(),player.registryAccess());
+        RegistryFriendlyByteBuf buf=new RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.buffer(),player.registryAccess(),ConnectionType.NEOFORGE);
         try{
-            ConfigSnapshot.CODEC.encode(buf,snapshot);int size=buf.readableBytes();
+            byte[] packed;
+            if(cachedSnapshot!=null&&cachedSnapshot.rules()==snapshot.rules()&&cachedSnapshot.mobs()==snapshot.mobs()&&cachedSnapshot.shield()==snapshot.shield()&&cachedSnapshot.damage()==snapshot.damage()&&cachedSnapshot.policy()==snapshot.policy())packed=cachedSnapshotBytes;
+            else{ConfigSnapshot.CODEC.encode(buf,snapshot);packed=compress(buf);cachedSnapshot=snapshot;cachedSnapshotBytes=packed;}int size=packed.length;
             if(size>MAX_SAVE_BYTES)throw new IllegalArgumentException("Config snapshot is too large.");
             int total=(size+SAVE_CHUNK_BYTES-1)/SAVE_CHUNK_BYTES,request=++nextSnapshot;
             for(int index=0;index<total;index++){
-                byte[] bytes=new byte[Math.min(SAVE_CHUNK_BYTES,buf.readableBytes())];buf.readBytes(bytes);
+                byte[] bytes=java.util.Arrays.copyOfRange(packed,index*SAVE_CHUNK_BYTES,Math.min(size,(index+1)*SAVE_CHUNK_BYTES));
                 PacketDistributor.sendToPlayer(player,new SnapshotChunk(request,total,index,bytes));
             }
-        }finally{buf.release();}
+        }finally{if(buf!=null)buf.release();}
     }
     public static void sendConfigData(ServerPlayer player,CustomPacketPayload payload) {
         if(payload instanceof Settings data)sendSnapshot(player,new ConfigSnapshot(data,null,null,null,null));
@@ -95,8 +112,8 @@ public final class GuardConfigTransfer {
         if(chunk.index()==0)clientSnapshot=new Upload(part);
         if(clientSnapshot==null||!clientSnapshot.append(part)){clearClientSnapshot();return;}
         byte[] bytes=clientSnapshot.complete();if(bytes==null)return;clearClientSnapshot();
-        RegistryFriendlyByteBuf buf=new RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(bytes),context.player().registryAccess());
-        try{
+        RegistryFriendlyByteBuf buf=null;
+        try{buf=new RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(decompress(bytes)),context.player().registryAccess(),ConnectionType.NEOFORGE);
             ConfigSnapshot snapshot=ConfigSnapshot.CODEC.decode(buf);
             if(buf.readableBytes()!=0)throw new IllegalArgumentException("Trailing config snapshot data.");
             if(snapshot.policy()!=null)GuardClient.clientPolicy(snapshot.policy());
@@ -105,7 +122,7 @@ public final class GuardConfigTransfer {
             if(snapshot.shield()!=null)GuardClient.shieldSettings(snapshot.shield());
             if(snapshot.damage()!=null)GuardClient.damageState(snapshot.damage());
         }catch(RuntimeException error){System.err.println("Mallard Guard: could not read config snapshot: "+error.getMessage());}
-        finally{buf.release();}
+        finally{if(buf!=null)buf.release();}
     }
 
 }

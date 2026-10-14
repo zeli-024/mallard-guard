@@ -42,7 +42,14 @@ public final class GuardState {
 
     public static void clearClientAttackLock() { clientAttackUntil = Long.MIN_VALUE; }
 
+    /** Server authority for an active stance, independent of the client presentation. */
+    public static boolean guarding(Player player) {
+        GuardState state=STATES.get(player.getUUID());
+        return player.isAlive() && state!=null && state.held && state.phase!=0;
+    }
+
     public static void attackStarted(Player player) {
+        if(!player.level().isClientSide && guarding(player))return;
         long until = player.level().getGameTime() + Math.max(1, (int) Math.ceil(player.getCurrentItemAttackStrengthDelay()));
         if (player.level().isClientSide) clientAttackUntil = Math.max(clientAttackUntil, until);
         else if (player instanceof ServerPlayer serverPlayer) {
@@ -53,7 +60,9 @@ public final class GuardState {
     }
 
     public static void attacked(net.neoforged.neoforge.event.entity.player.AttackEntityEvent event) {
-        if (!event.isCanceled() && !event.getEntity().level().isClientSide) attackStarted(event.getEntity());
+        if(event.isCanceled() || event.getEntity().level().isClientSide)return;
+        if(guarding(event.getEntity()))event.setCanceled(true);
+        else attackStarted(event.getEntity());
     }
     public static final ResourceLocation GUARD_SLOWDOWN = ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "guard_slowdown");
     private boolean held;
@@ -70,10 +79,17 @@ public final class GuardState {
     private boolean breakPending;
     private boolean guardReleaseRequired;
     private GuardPackets.Status lastStatus;
+    private long inputId;
+    private boolean inputAccepted, inputProcessing;
     private static boolean clientCooldownPreventsGuard = true;
     private static boolean clientAllowEmptyHand;
     private static GuardPackets.Settings clientRules;
     private static String clientShieldBlacklist="";
+    private static int clientShieldPriority, clientHandPriority;
+    private static boolean clientCrouchOffhand;
+    public static void setClientHandRules(int shieldPriority, int handPriority, boolean crouchOffhand) {
+        clientShieldPriority=shieldPriority;clientHandPriority=handPriority;clientCrouchOffhand=crouchOffhand;
+    }
     private static final GuardItemRules.Source CLIENT_INCLUDED=new GuardItemRules.Source(),CLIENT_EXCLUDED=new GuardItemRules.Source();
     public static void setClientShieldBlacklist(String blacklist){clientShieldBlacklist=blacklist;}
     public static void setClientRules(GuardPackets.Settings rules){clientRules=rules;if(rules==null){CLIENT_INCLUDED.clear();CLIENT_EXCLUDED.clear();GuardItemRules.clearClientShieldRules();}}
@@ -100,7 +116,7 @@ public final class GuardState {
     }
 
     public static boolean eligible(Player player, InteractionHand hand) {
-        if (!attackReady(player)) return false;
+        if(!attackReady(player))return false;
         ItemStack stack = player.getItemInHand(hand);
         if (!stack.isEmpty() && (player.level().isClientSide ? clientCooldownPreventsGuard : GuardConfig.COOLDOWN_PREVENTS_GUARD.get())
             && player.getCooldowns().isOnCooldown(stack.getItem())) return false;
@@ -129,6 +145,47 @@ public final class GuardState {
         clientAllowEmptyHand = enabled;
     }
 
+    /** Both sides use the same priorities; the server validates the requested random hand. */
+    public static InteractionHand chooseHand(Player player, boolean randomOffhand, InteractionHand lastToolHand, int toolHandRun) {
+        boolean mainEligible=eligible(player,InteractionHand.MAIN_HAND), offEligible=eligible(player,InteractionHand.OFF_HAND);
+        if (!mainEligible || !offEligible) return mainEligible?InteractionHand.MAIN_HAND:offEligible?InteractionHand.OFF_HAND:null;
+        boolean client=player.level().isClientSide && clientRules!=null;
+        boolean crouch=client?clientCrouchOffhand:GuardConfig.FORCE_CROUCH_OFFHAND.get();
+        if (crouch && player.isShiftKeyDown()) return InteractionHand.OFF_HAND;
+        boolean mainShield=client?GuardItemRules.clientShieldLike(player.getMainHandItem(),clientRules.shieldItems(),clientShieldBlacklist):GuardItemRules.shieldLike(player.getMainHandItem());
+        boolean offShield=client?GuardItemRules.clientShieldLike(player.getOffhandItem(),clientRules.shieldItems(),clientShieldBlacklist):GuardItemRules.shieldLike(player.getOffhandItem());
+        if (mainShield || offShield) {
+            int priority=client?clientShieldPriority:GuardConfig.SHIELD_PARRY_PRIORITY.get();
+            if (priority==2) return InteractionHand.MAIN_HAND;
+            if (priority==1) return mainShield?InteractionHand.MAIN_HAND:InteractionHand.OFF_HAND;
+        } else {
+            int priority=client?clientHandPriority:GuardConfig.PARRY_HAND_PRIORITY.get();
+            if (priority==1) return InteractionHand.OFF_HAND;
+            if (priority==2) return InteractionHand.MAIN_HAND;
+            if (toolHandRun>=2) return lastToolHand==InteractionHand.MAIN_HAND?InteractionHand.OFF_HAND:InteractionHand.MAIN_HAND;
+        }
+        return randomOffhand?InteractionHand.OFF_HAND:InteractionHand.MAIN_HAND;
+    }
+
+    public static long inputId(ServerPlayer player) {
+        GuardState state=STATES.get(player.getUUID());return state==null?0:state.inputId;
+    }
+
+    public static void input(ServerPlayer player, GuardPackets.Input request) {
+        if (!player.isAlive() || request.inputId()<=0) return;
+        GuardState state=STATES.computeIfAbsent(player.getUUID(),ignored->new GuardState());
+        if (request.inputId()<=state.inputId) return;
+        state.inputId=request.inputId();state.inputAccepted=false;
+        state.inputProcessing=true;
+        try { input(player,request.pressed(),request.offhand()); }
+        finally {
+            state.inputProcessing=false;
+            state.inputAccepted=request.pressed() && state.held && state.phase!=0;
+            // Rejections also acknowledge the attempt, even when no combat value changed.
+            sync(player,state);
+        }
+    }
+
     public static void input(ServerPlayer player, boolean down, boolean requestedOffhand) {
         if(!player.isAlive()){forget(player);GuardRetaliation.cancelPending(player);return;}
         GuardState state = STATES.computeIfAbsent(player.getUUID(), ignored -> new GuardState());
@@ -147,24 +204,8 @@ public final class GuardState {
             return;
         }
         if (state.held || state.guardReleaseRequired || state.recharge > 0 || (!GuardConfig.PARRY.get() && !GuardConfig.BLOCK.get())) return;
-        boolean mainEligible = eligible(player, InteractionHand.MAIN_HAND);
-        boolean offEligible = eligible(player, InteractionHand.OFF_HAND);
-        InteractionHand hand = mainEligible ? InteractionHand.MAIN_HAND : offEligible ? InteractionHand.OFF_HAND : null;
-        if (mainEligible && offEligible) {
-            boolean mainShield = GuardItemRules.shieldLike(player.getMainHandItem());
-            boolean offShield = GuardItemRules.shieldLike(player.getOffhandItem());
-            if (GuardConfig.FORCE_CROUCH_OFFHAND.get() && player.isShiftKeyDown()) hand = InteractionHand.OFF_HAND;
-            else if (mainShield || offShield) {
-                int priority = GuardConfig.SHIELD_PARRY_PRIORITY.get();
-                hand = priority == 2 ? InteractionHand.MAIN_HAND
-                    : priority == 1 ? (mainShield ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND)
-                    : player.getRandom().nextBoolean() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
-            } else {
-                int priority = GuardConfig.PARRY_HAND_PRIORITY.get();
-                hand = priority == 1 ? InteractionHand.OFF_HAND : priority == 2 ? InteractionHand.MAIN_HAND
-                    : state.toolHandRun >= 2 ? (state.lastToolHand == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND)
-                    : player.getRandom().nextBoolean() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
-            }
+        InteractionHand hand = chooseHand(player, requestedOffhand, state.lastToolHand, state.toolHandRun);
+        if (hand != null && eligible(player, InteractionHand.MAIN_HAND) && eligible(player, InteractionHand.OFF_HAND)) {
             state.toolHandRun = hand == state.lastToolHand ? state.toolHandRun + 1 : 1;
             state.lastToolHand = hand;
         }
@@ -258,6 +299,18 @@ public final class GuardState {
         state.held = false;
     }
 
+    /** Reuse the recharge meter without imposing movement or attack stun. */
+    public static void parriedGuardBreak(ServerPlayer player,int ticks){
+        if(ticks<=0)return;
+        GuardState state=STATES.computeIfAbsent(player.getUUID(),ignored->new GuardState());
+        input(player,false,false);
+        state.recharge=Math.max(state.recharge,ticks);
+        state.rechargeDuration=state.recharge;
+        state.breakPending=false;
+        updateMovement(player,false);
+        sync(player,state);
+    }
+
     public static void updateMovement(LivingEntity player, boolean guarding) {
         AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed == null) return;
@@ -281,7 +334,7 @@ public final class GuardState {
         if (source.is(DamageTypes.FALL) || source.is(DamageTypes.FLY_INTO_WALL)) {
             // Ground impacts require deliberate downward aim. Keep the existing
             // flying-into-wall behavior separate from fall damage.
-            if (source.is(DamageTypes.FALL) && GuardConfig.FALL_LOOK_DOWN.get()
+            if (source.is(DamageTypes.FALL)
                 && player.getLookAngle().y > -Math.sin(Math.toRadians(40.0D)))
                 return Result.NONE;
             return handleHit(player, SourceKind.FALL, null, parryAllowed);
@@ -323,7 +376,6 @@ public final class GuardState {
         }
         if (state.phase == 0 || state.phase == 4) return Result.NONE;
         Result result = state.phase == 1 ? Result.PERFECT : state.phase == 2 ? Result.PARRY : Result.BLOCK;
-        if (kind == SourceKind.FALL && result == Result.PERFECT && !GuardConfig.FALL_PERFECT_PARRY.get()) result = Result.PARRY;
         if (result == Result.BLOCK && !canBlock(kind) || result != Result.BLOCK && (!parryAllowed || !canParry(kind, result))) return Result.NONE;
         if (result == Result.BLOCK && !GuardItemRules.shieldLike(state.heldItem)) {
             int max = GuardItemBlockCounts.limit(state.heldItem, false);
@@ -381,7 +433,7 @@ public final class GuardState {
     public static void preventVanillaShieldUse(PlayerInteractEvent.RightClickItem event) {
         if (!(event.getEntity() instanceof ServerPlayer player)
             || !(GuardItemRules.shieldLike(player.getItemInHand(event.getHand()))
-                || GuardItemRules.simplySwordsWeapon(player.getItemInHand(event.getHand())))
+                || GuardCompatibility.simplySwordsWeapon(player.getItemInHand(event.getHand())))
             || GuardConfig.CONSUMABLE_PRIORITY.get() && GuardItemRules.consumableInEitherHand(player)) return;
         event.setCanceled(true);
         // Guard owns shield use. Consume this standalone attempt without a swing,
@@ -408,9 +460,10 @@ public final class GuardState {
 
     private static boolean canParry(SourceKind kind, Result result) {
         return switch (kind) {
-            case MELEE, OTHER, FALL -> true;
+            case MELEE, OTHER -> true;
+            case FALL -> GuardConfig.FALL_PARRY.get() && (!GuardConfig.PERFECT_FALL_ONLY.get() || result == Result.PERFECT);
             case EXPLOSION -> GuardConfig.PARRY_EXPLOSIONS.get() && (!GuardConfig.PERFECT_EXPLOSIONS_ONLY.get() || result == Result.PERFECT);
-            case PROJECTILE_IMPACT, PROJECTILE_DAMAGE -> GuardConfig.PARRY_PROJECTILES.get();
+            case PROJECTILE_IMPACT, PROJECTILE_DAMAGE -> GuardConfig.PARRY_PROJECTILES.get() && (!GuardConfig.PERFECT_PROJECTILES_ONLY.get() || result == Result.PERFECT);
         };
     }
 
@@ -441,6 +494,7 @@ public final class GuardState {
     }
 
     private static void sync(ServerPlayer player, GuardState state) {
+        if (state.inputProcessing) return;
         boolean shield = GuardItemRules.shieldLike(state.heldItem);
         int window=(shield ? GuardShieldExpansionCompat.parryTicks(state.heldItem,GuardConfig.SHIELD_PARRY_TICKS.get()) : GuardConfig.PARRY_TICKS.get());
         int duration=Math.max(1,state.rechargeDuration);
@@ -448,9 +502,11 @@ public final class GuardState {
         GuardPackets.Status previous=state.lastStatus;
         if(previous!=null && previous.phase()==state.phase && previous.elapsed()==state.elapsed
             && previous.recharge()==state.recharge && previous.window()==window
-            && previous.rechargeMax()==duration && previous.offhand()==offhand)return;
+            && previous.rechargeMax()==duration && previous.offhand()==offhand
+            && previous.inputId()==state.inputId && previous.accepted()==state.inputAccepted
+            && previous.toolHandRun()==state.toolHandRun && previous.toolOffhand()==(state.lastToolHand==InteractionHand.OFF_HAND))return;
         GuardPackets.Status status = new GuardPackets.Status(state.phase, state.elapsed, state.recharge,
-            window,duration,offhand);
+            window,duration,offhand,state.inputId,state.inputAccepted,state.toolHandRun,state.lastToolHand==InteractionHand.OFF_HAND);
         if (!status.equals(state.lastStatus)) {
             if (state.lastStatus == null || (state.lastStatus.phase() == 0) != (status.phase() == 0)
                 || state.lastStatus.offhand() != status.offhand())

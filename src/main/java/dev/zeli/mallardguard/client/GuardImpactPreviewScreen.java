@@ -1,6 +1,7 @@
 package dev.zeli.mallardguard.client;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import dev.zeli.mallardguard.GuardScreenSettings;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,7 @@ final class GuardImpactPreviewScreen extends GuardPreviewScreen {
     private final List<Button> buttons = new ArrayList<>();
     private final java.util.Map<Button, String> buttonTips = new java.util.HashMap<>();
     private TextureTarget scene;
+    private final GuardRenderTargets.State previewState=new GuardRenderTargets.State();
     private boolean capturePending = true;
     private boolean shaderAvailable = true;
 
@@ -46,12 +48,18 @@ final class GuardImpactPreviewScreen extends GuardPreviewScreen {
             .bounds(left + 12 + half, top + 22, half, 18).build()));
         buttons.get(mob ? 1 : 0).active = false;
         if (mob) {
-            Button adapt = addRenderableWidget(GuardUi.builder(Component.literal("Adapt: " + (values[56] != 0 ? "On" : "Off")), b -> {  values[56] = values[56] == 0 ? 1 : 0;rebuild(); })
+            Button adapt = addRenderableWidget(GuardUi.builder(Component.literal("Adapt: " + GuardUi.enabledLabel(values[56] != 0)), b -> {  values[56] = values[56] == 0 ? 1 : 0;rebuild(); })
                 .bounds(left + 6, top + 43, half, 18).build()); adapt.active = editable; buttons.add(adapt);
             buttonTips.put(adapt, "Follow your parry impact settings instead of independent mob settings. Default: On.");
-            Button invert = addRenderableWidget(GuardUi.builder(Component.literal("Invert: " + (values[57] != 0 ? "On" : "Off")), b -> {  values[57] = values[57] == 0 ? 1 : 0;rebuild(); })
+            Button invert = addRenderableWidget(GuardUi.builder(Component.literal("Invert: " + GuardUi.enabledLabel(values[57] != 0)), b -> {  values[57] = values[57] == 0 ? 1 : 0;rebuild(); })
                 .bounds(left + 12 + half, top + 43, half, 18).build()); invert.active = editable; buttons.add(invert);
             buttonTips.put(invert, "Invert the mob impact filter. Works independently of Adapt. Default: On.");
+        }
+        if(!mob){
+            int slot=GuardScreenSettings.PLAYER_IMPACT_INVERT;
+            Button invert=addRenderableWidget(GuardUi.button("Invert: "+GuardUi.enabledLabel(values[slot]!=0),left+6,top+43,half,18,()->{values[slot]=values[slot]==0?1:0;rebuild();}));
+            invert.active=editable;buttons.add(invert);buttonTips.put(invert,"Invert your impact frame. Default: Off.");
+            Button perfectOnly=addRenderableWidget(GuardUi.button("Perfect Only: "+GuardUi.enabledLabel(values[35]!=0),left+12+half,top+43,half,18,()->{values[35]=values[35]==0?1:0;rebuild();}));perfectOnly.active=editable;buttons.add(perfectOnly);buttonTips.put(perfectOnly,"Only perfect parries use Impact Frame. Default: On.");
         }
         int labelWidth = Math.min(130, panelWidth / 2);
         for (int i = 0; i < NAMES.length; i++) {
@@ -66,16 +74,19 @@ final class GuardImpactPreviewScreen extends GuardPreviewScreen {
                 + (mob ? " Adapt follows your parry settings; turn it off for independent sliders. Invert is independent." : " Changes are saved by Apply on the main config screen.")));
         }
         int bw=(panelWidth-24)/3;
-        Button reset=addRenderableWidget(GuardUi.button("Reset",left+6,top+panelHeight-25,bw,20,()->GuardUi.confirm(this,"Reset impact values?","Restore both impact screens to their defaults.",()->{for(int i=40;i<=43;i++)values[i]=dev.zeli.mallardguard.GuardClientPreset.DEFAULTS[i];for(int i=50;i<=57;i++)values[i]=dev.zeli.mallardguard.GuardClientPreset.DEFAULTS[i];})));reset.active=editable;buttons.add(reset);
+        Button reset=addRenderableWidget(GuardUi.button("Reset",left+6,top+panelHeight-25,bw,20,()->GuardUi.confirm(this,"Reset impact values?","Restore both impact screens to their defaults.",()->{values[GuardScreenSettings.PLAYER_IMPACT_INVERT]=0;values[35]=1;for(int i=40;i<=43;i++)values[i]=dev.zeli.mallardguard.GuardClientPreset.DEFAULTS[i];for(int i=50;i<=57;i++)values[i]=dev.zeli.mallardguard.GuardClientPreset.DEFAULTS[i];})));reset.active=editable;buttons.add(reset);
         Button apply=addRenderableWidget(GuardUi.button("Apply",left+12+bw,top+panelHeight-25,bw,20,()->apply(true)));apply.active=editable;buttons.add(apply);
         buttons.add(addRenderableWidget(GuardUi.button("Close",left+18+2*bw,top+panelHeight-25,bw,20,this::onClose)));
         visibilityButton();buttons.add(visibility);
     }
     private void rebuild() { clearWidgets(); init(); }
+    @Override public boolean isPauseScreen(){return true;}
 
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
         graphics.flush();RenderTarget target = Minecraft.getInstance().getMainRenderTarget();
         if (target.width > 0 && target.height > 0) {
+            previewState.save();
+            try{
             if (scene == null || scene.width != target.width || scene.height != target.height) {
                 if (scene != null) scene.destroyBuffers();
                 scene = new TextureTarget(target.width, target.height, false, false);
@@ -88,8 +99,9 @@ final class GuardImpactPreviewScreen extends GuardPreviewScreen {
             }
             int base = mob && values[56] == 0 ? 51 : 40;
             int chromatic = mob && values[56] == 0 ? values[55] : values[50];
-            shaderAvailable = GuardImpactFrame.draw(scene, target, values[base], values[base + 1], values[base + 2], values[base + 3], chromatic, mob && values[57] != 0);
+            shaderAvailable = GuardImpactFrame.draw(scene, target, values[base], values[base + 1], values[base + 2], values[base + 3], chromatic, mob ? values[57] != 0 : values[GuardScreenSettings.PLAYER_IMPACT_INVERT]!=0);
             if (!shaderAvailable) copy(scene, target);
+            }finally{previewState.restore();}
         }
         beginPreview(graphics);
         {

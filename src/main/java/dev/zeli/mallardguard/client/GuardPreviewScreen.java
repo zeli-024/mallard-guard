@@ -25,15 +25,21 @@ abstract class GuardPreviewScreen extends Screen {
     protected void beginPreview(GuiGraphics g) {
         g.flush(); RenderTarget target = Minecraft.getInstance().getMainRenderTarget();
         long now = System.nanoTime(); float elapsed = frameTime == 0 ? 1 : Math.min(1, (now - frameTime) / 140000000.0F); frameTime = now;
-        opacity += ((hidden ? 0 : adjusting || now < editingUntil ? 0.06F : 1) - opacity) * elapsed;
+        float fadeTarget=hidden?0:(adjusting||now<editingUntil)?Math.min(0.06F,previewOpacity()):previewOpacity();
+        opacity += (fadeTarget - opacity) * elapsed;
+        boolean blur=blurPreview();
+        if(!blur&&opacity>=0.999F){opacity=1;return;}
         if (clean == null || clean.width != target.width || clean.height != target.height) {
             dispose(); clean = new TextureTarget(target.width, target.height, false, false);
         }
         copy(target, clean);
-        if (blurPreview()) GuardImpactFrame.drawBlur(clean, target);
+        if (blur) GuardImpactFrame.drawBlur(clean, target);
         target.bindWrite(false);
     }
     protected boolean blurPreview(){return true;}
+    protected float previewOpacity(){return 1.0F;}
+    protected void restorePreviewOpacity(){}
+    protected final void previewOpacityChanged(){if(previewOpacity()<=0.001F)noticeUntil=System.nanoTime()+2_000_000_000L;}
     protected boolean fadesWhileAdjusting(net.minecraft.client.gui.components.AbstractSliderButton slider){return true;}
     protected final void valueChanged(){editingUntil=System.nanoTime()+400_000_000L;}
     protected void endPreview(GuiGraphics g) {
@@ -43,7 +49,7 @@ abstract class GuardPreviewScreen extends Screen {
             if(composed==null)composed=new TextureTarget(target.width,target.height,false,false);copy(target,composed);
             GuardImpactFrame.drawMix(composed,clean,target,opacity);target.bindWrite(false);
         }
-        if(hidden&&System.nanoTime()<noticeUntil){
+        if((hidden||previewOpacity()<=0.001F)&&System.nanoTime()<noticeUntil){
             long remaining=noticeUntil-System.nanoTime();
             float alpha=Math.min(1,Math.min((2_000_000_000L-remaining)/180_000_000F,remaining/350_000_000F));
             String text="Click anywhere to show the controls.";int w=font.width(text)+20,x=(width-w)/2,y=(height-22)/2;
@@ -53,14 +59,14 @@ abstract class GuardPreviewScreen extends Screen {
     }
     protected static void copy(RenderTarget from,RenderTarget to){GuardRenderTargets.copy(from,to);}
     @Override public boolean mouseClicked(double x, double y, int button) {
-        if(hidden){hidden=false;noticeUntil=0;return true;}
+        if(hidden||previewOpacity()<=0.001F){hidden=false;noticeUntil=0;if(previewOpacity()<=0.001F)restorePreviewOpacity();return true;}
         adjusting = button == 0 && children().stream().anyMatch(w -> w instanceof net.minecraft.client.gui.components.AbstractSliderButton a && a.active && a.visible && fadesWhileAdjusting(a) && a.isMouseOver(x,y));
         return super.mouseClicked(x,y,button);
     }
     @Override public boolean mouseReleased(double x, double y, int button) { adjusting = false; return super.mouseReleased(x,y,button); }
-    @Override public boolean mouseScrolled(double x,double y,double sx,double sy){return hidden||super.mouseScrolled(x,y,sx,sy);}
-    @Override public boolean keyPressed(int key,int scan,int mods){if(hidden){if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE){hidden=false;noticeUntil=0;}return true;}return super.keyPressed(key,scan,mods);}
-    @Override public boolean charTyped(char ch,int mods){return hidden||super.charTyped(ch,mods);}
+    @Override public boolean mouseScrolled(double x,double y,double sx,double sy){return hidden||previewOpacity()<=0.001F||super.mouseScrolled(x,y,sx,sy);}
+    @Override public boolean keyPressed(int key,int scan,int mods){if(hidden||previewOpacity()<=0.001F){if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE){hidden=false;noticeUntil=0;if(previewOpacity()<=0.001F)restorePreviewOpacity();}return true;}return super.keyPressed(key,scan,mods);}
+    @Override public boolean charTyped(char ch,int mods){return hidden||previewOpacity()<=0.001F||super.charTyped(ch,mods);}
     private void dispose() { if (clean != null) clean.destroyBuffers(); if (composed != null) composed.destroyBuffers(); clean = composed = null; }
     @Override public void removed() { dispose();adjusting=false;editingUntil=frameTime=0;opacity=1; }
     @Override public boolean isPauseScreen() { return false; }

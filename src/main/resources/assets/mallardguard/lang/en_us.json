@@ -3,5 +3,6 @@
   "key.mallardguard.guard": "Guard",
   "key.mallardguard.open_config": "Open Config",
   "message.mallardguard.simply_swords_bind_ability": "Mallard Guard disables Simply Swords' unbound Right Click ability fallback. Bind Simply Swords' Main Hand Ability to Right Click or another key to use it.",
-  "message.mallardguard.shield_expansion_item_only": "Mallard Guard: Shield Expansion detected. Item Only Mode enabled; Mallard Guard handles combat and preserves shield stats."
+  "message.mallardguard.shield_expansion_item_only": "Mallard Guard: Shield Expansion detected. Item Only Mode enabled; Mallard Guard handles combat and preserves shield stats.",
+  "message.mallardguard.punchy_movement_defaults": "Mallard Guard turned off Punchy's walking and sprint arm animations. You can re-enable them in Punchy's settings."
 }

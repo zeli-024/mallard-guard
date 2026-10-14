@@ -37,13 +37,13 @@ public final class GuardEffects {
 
     public static void onHit(ServerPlayer player, DamageSource source, GuardState.Result result, Vec3 impactDirection,float damage) {
         if(result!=GuardState.Result.BLOCK && source.getEntity() instanceof ServerPlayer attacker && attacker!=player)
-            PacketDistributor.sendToPlayer(attacker,new GuardPackets.MobCounter(result==GuardState.Result.PERFECT));
+            PacketDistributor.sendToPlayer(attacker,new GuardPackets.MobCounter(result==GuardState.Result.PERFECT,player.getId(),GuardConfig.INCOMING_REACTION.get()!=0&&GuardConfig.PARRIED_ENABLED.get(),GuardCombatEffects.incomingParry(attacker)));
         emit(player, source, result, impactDirection, GuardState.shieldGuard(player), GuardState.emptyHandGuard(player),damage);
     }
 
     public static void onMobHit(net.minecraft.world.entity.Mob mob, DamageSource source, GuardState.Result result, boolean shield,float damage) {
         if (result != GuardState.Result.BLOCK && source.getEntity() instanceof ServerPlayer attacker) {
-            PacketDistributor.sendToPlayer(attacker, new GuardPackets.MobCounter(result == GuardState.Result.PERFECT));
+            PacketDistributor.sendToPlayer(attacker, new GuardPackets.MobCounter(result == GuardState.Result.PERFECT,mob.getId(),GuardConfig.INCOMING_REACTION.get()!=0&&GuardConfig.PARRIED_ENABLED.get(),GuardCombatEffects.incomingParry(attacker)));
         }
         emit(mob, source, result, null, shield, false,damage);
     }

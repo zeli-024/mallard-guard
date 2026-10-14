@@ -11,6 +11,10 @@ rm -f -- shooting-spark-tuning.md
 # Remove Continuous Guard input interception from older source overlays.
 rm -f -- src/main/java/dev/zeli/mallardguard/mixin/client/MinecraftGuardAttackMixin.java
 
+# Swing state and feint handling now share the Better Combat adapter.
+rm -f -- src/main/java/dev/zeli/mallardguard/client/GuardFeint.java
+rm -f -- src/main/java/dev/zeli/mallardguard/mixin/client/BetterCombatFeintMixin.java
+
 # Retired impact components left by an older ZIP overlay.
 rm -rf -- src/main/resources/assets/mallardguard/textures/particle/center_impact/ring
 rm -rf -- src/main/resources/assets/mallardguard/textures/particle/center_impact/cross
@@ -34,3 +38,5 @@ rm -f -- release-notes/1.54c-beta-11-draft.md
 
 # Remove retired textures left by an older source overlay.
 rm -rf -- src/main/resources/assets/mallardguard/textures/particle/parry_disc
+
+rm -f src/main/resources/assets/mallardguard/textures/gui/block_vignette.png

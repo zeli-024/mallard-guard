@@ -1,6 +1,7 @@
 package dev.zeli.mallardguard.client;
 
 import dev.zeli.mallardguard.GuardParticleConfig;
+import dev.zeli.mallardguard.GuardDiagnostics;
 import dev.zeli.mallardguard.GuardParticleColors;
 import dev.zeli.mallardguard.GuardSparkTracerConfig;
 import dev.zeli.mallardguard.GuardPackets;
@@ -25,8 +26,8 @@ public final class GuardParryParticleSpawner {
             var mc=Minecraft.getInstance();
             if(mc.level==null || !Float.isFinite(hit.damage()) || hit.damage()<0)return;
             boolean colored=hit.tracerStartColor()>=0&&hit.tracerStartColor()<=0xFFFFFF&&hit.tracerMiddleColor()>=0&&hit.tracerMiddleColor()<=0xFFFFFF&&hit.tracerEndColor()>=0&&hit.tracerEndColor()<=0xFFFFFF;
-            GuardPackets.Palette colors = playerPalette;
-            if(colored)colors=new GuardPackets.Palette(GuardParticleColors.get(GuardParticleColors.BASE),GuardParticleColors.get(GuardParticleColors.DEBRIS_COLOR),hit.tracerStartColor(),hit.tracerMiddleColor(),hit.tracerEndColor());
+            GuardPackets.Palette colors = (playerPalette==null?GuardPackets.Palette.readLocal():playerPalette);
+            if(colored)colors=new GuardPackets.Palette(hit.tracerStartColor(),hit.tracerStartColor(),hit.tracerStartColor(),hit.tracerMiddleColor(),hit.tracerEndColor());
             if(GuardImpactParticle.enabled()){
                 var impact=mc.particleEngine.createParticle(GuardParticles.CENTER_IMPACT.get(),hit.x(),hit.y(),hit.z(),0,0,0);
                 if(colors!=null)palette(impact,colors);
@@ -40,6 +41,7 @@ public final class GuardParryParticleSpawner {
             if(GuardParticleColors.get(GuardParticleColors.TRACER_ENABLED)==0||GuardParticleColors.get(GuardParticleColors.TRACER_SIZE)==0)tracerCount=0;
             int budget=Math.min(GuardParticleConfig.MAX_BURST_HEADS,GuardParryParticleRenderer.availableCapacity(mc.level));
             int[] counts=GuardParryParticleMath.allocateCounts(budget,flyingCount,debrisCount,tracerCount);
+            if(GuardDiagnostics.enabled(GuardDiagnostics.PARTICLE_SPAWNS))GuardDiagnostics.event(GuardDiagnostics.PARTICLE_SPAWNS,"Particle burst: perfect="+hit.perfect()+", requested="+flyingCount+"/"+debrisCount+"/"+tracerCount+", allocated="+counts[0]+"/"+counts[1]+"/"+counts[2]+", budget="+budget+", impact="+GuardImpactParticle.enabled());
             flyingCount=counts[0];debrisCount=counts[1];tracerCount=counts[2];
             int total=flyingCount+debrisCount+tracerCount;if(total==0)return;
             double debrisBias=GuardParticleConfig.DEBRIS_BIAS/100.0;
@@ -71,7 +73,7 @@ public final class GuardParryParticleSpawner {
                     debris?(mid+debrisVariation*(GuardParryParticleMath.debrisLaunchSpeed(variation)-mid))*debrisSpeedScale:
                     mid*tracerScale*GuardParryParticleMath.varianceFactor(variation,tracerVariation);
                 var particle=mc.particleEngine.createParticle(flying?GuardParticles.FLYING_SPARK.get():debris?GuardParticles.SPARK_DEBRIS.get():GuardParticles.SPARK_TRACER.get(),hit.x(),hit.y(),hit.z(),dx*speed,dy*speed,dz*speed);
-                if(colors!=null && (playerPalette!=null || !flying&&!debris))palette(particle,colors);
+                if(colors!=null && (colored||playerPalette!=null || !flying&&!debris))palette(particle,colors);
             }
         }
     }

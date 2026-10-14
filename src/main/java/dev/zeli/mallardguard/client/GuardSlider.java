@@ -38,11 +38,13 @@ final class GuardSlider extends AbstractSliderButton {
         precise((int) Math.signum(sy)); return true;
     }
     @Override public boolean keyPressed(int key, int scan, int modifiers) {
+        if(!active)return false;
         if (active && (key == 263 || key == 262)) { precise(key == 263 ? -1 : 1); return true; }
         return super.keyPressed(key, scan, modifiers);
     }
     @Override public void onClick(double x, double y) { dragWidth = getWidth(); super.onClick(x, y); }
     @Override protected void onDrag(double x, double y, double dx, double dy) {
+        if(!active)return;
         int displayedWidth = getWidth(); if (dragWidth > 0) setWidth(dragWidth);
         try { super.onDrag(x, y, dx, dy); } finally { setWidth(displayedWidth); }
     }

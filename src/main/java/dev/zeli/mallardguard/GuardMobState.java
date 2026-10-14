@@ -119,6 +119,7 @@ public final class GuardMobState {
         boolean perfect=elapsed<GuardConfig.MOB_PERFECT_TICKS.get();
         if(!parryAllowed||!GuardConfig.PARRY.get()
             ||projectile&&!GuardConfig.PARRY_PROJECTILES.get()||explosion&&!GuardConfig.PARRY_EXPLOSIONS.get()
+            ||projectile&&GuardConfig.PERFECT_PROJECTILES_ONLY.get()&&!perfect
             ||explosion&&GuardConfig.PERFECT_EXPLOSIONS_ONLY.get()&&!perfect)return GuardState.Result.NONE;
         GuardState.Result result=perfect?GuardState.Result.PERFECT:GuardState.Result.PARRY;
         boolean shield=GuardItemRules.shieldLike(previous.item);
@@ -146,11 +147,11 @@ public final class GuardMobState {
         GuardEffects.onMobHit(mob, source, result, shield,event.getAmount());
         wear(mob, state, result, event.getAmount());
         event.setCanceled(true);
-        GuardCombatEffects.pushDefender(mob,origin,shield);
+        GuardCombatEffects.pushDefender(mob,origin,shield,result==GuardState.Result.PERFECT);
         if(source.getEntity() instanceof LivingEntity attacker&&combatOpponent(mob,attacker)){
-            GuardCombatEffects.pushAttacker(mob,attacker,shield);
+            GuardCombatEffects.pushAttacker(mob,attacker,shield,result==GuardState.Result.PERFECT);
             boolean retaliate=(result==GuardState.Result.PERFECT?GuardConfig.MOB_PERFECT_RETALIATION:GuardConfig.MOB_REGULAR_RETALIATION).get();
-            if(retaliate&&source.getDirectEntity()==attacker){
+            if(retaliate&&GuardConfig.RETALIATION_ENABLED.get()&&source.getDirectEntity()==attacker){
                 float multiplier=shield?result==GuardState.Result.PERFECT?GuardConfig.SHIELD_RETALIATION_PERCENT.get()/100F:0
                     :(result==GuardState.Result.PERFECT?GuardConfig.PERFECT_RETALIATION:GuardConfig.PARRY_RETALIATION).get().floatValue();
                 if(multiplier>0)MallardGuard.returnDamage(mob,attacker,event.getAmount()*multiplier);

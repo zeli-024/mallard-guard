@@ -50,7 +50,7 @@ public final class GuardSparkTracerConfig {
         TIPS[BASEINTENSITY]="Base amount. 100% produces 100 tracer heads; 0% disables Spark Tracers completely.";
         TIPS[PERFECTINTENSITY]="Extra amount on perfect parries. 0% keeps the base; 100% doubles it. Base 0% disables the effect.";
         TIPS[DAMAGESCALING]="Increase amount per damage point: 10% × 5 damage adds 50%. 0% adds nothing. All particles share burst and active head caps.";
-        DEFAULTS[BASEINTENSITY]=5;DEFAULTS[PERFECTINTENSITY]=50;DEFAULTS[DAMAGESCALING]=5;
+        DEFAULTS[BASEINTENSITY]=8;DEFAULTS[PERFECTINTENSITY]=32;DEFAULTS[DAMAGESCALING]=2;
         for(int i:DISPLAY_ORDER)MAX[i]=100;
     }
     private GuardSparkTracerConfig() {}

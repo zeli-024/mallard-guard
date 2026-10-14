@@ -6,6 +6,10 @@ import java.util.function.*;
 
 /** Editable values, snapshots and save ownership; independent of screen layout. */
 final class GuardConfigDraft {
+    boolean parriedEnabled,shieldConeEnabled;
+    boolean retaliationEnabled,perfectProjectilesOnly,perfectFallOnly;
+    int perfectKnockbackMultiplier;
+    int parriedGuardBreakTicks,parriedStunTicks,incomingReaction;
     boolean enforceEnabled;
     int dontEnforceMask;
     int[] enforcedDefaults;
@@ -37,7 +41,7 @@ final class GuardConfigDraft {
     boolean impactPerfectOnly;
     int flashStrength;
     int shakeStrength;
-    int hitlagFrames;
+    int hitlagTicks;
     int impactFrames;
     int impactBrightness;
     int impactContrast;
@@ -65,8 +69,6 @@ final class GuardConfigDraft {
     int perfectWear;
     int blockWear;
     boolean fallParry;
-    boolean fallPerfectParry;
-    boolean fallLookDown;
     boolean fallBreakBlocks;
     boolean parryExplosions;
     boolean perfectExplosionsOnly;
@@ -135,6 +137,15 @@ final class GuardConfigDraft {
         new Field<Integer>("mobDifficulty", () -> mobDifficulty, value -> mobDifficulty = value, GuardPackets.SAVE_MOBS),
         new Field<Integer>("mobGearChance", () -> mobGearChance, value -> mobGearChance = value, GuardPackets.SAVE_MOBS),
         new Field<LinkedHashMap<String, Boolean>>("damageRules", () -> damageRules, value -> damageRules = value, GuardPackets.SAVE_DAMAGE),
+        new Field<Boolean>("retaliationEnabled",()->retaliationEnabled,value->retaliationEnabled=value,GuardPackets.SAVE_SHIELD),
+        new Field<Boolean>("perfectProjectilesOnly",()->perfectProjectilesOnly,value->perfectProjectilesOnly=value,GuardPackets.SAVE_SHIELD),
+        new Field<Boolean>("perfectFallOnly",()->perfectFallOnly,value->perfectFallOnly=value,GuardPackets.SAVE_SHIELD),
+        new Field<Integer>("perfectKnockbackMultiplier",()->perfectKnockbackMultiplier,value->perfectKnockbackMultiplier=value,GuardPackets.SAVE_SHIELD),
+        new Field<Integer>("incomingReaction",()->incomingReaction,value->incomingReaction=value,GuardPackets.SAVE_SHIELD),
+        new Field<Boolean>("parriedEnabled",()->parriedEnabled,value->parriedEnabled=value,GuardPackets.SAVE_SHIELD),
+        new Field<Boolean>("shieldConeEnabled",()->shieldConeEnabled,value->shieldConeEnabled=value,GuardPackets.SAVE_SHIELD),
+        new Field<Integer>("parriedGuardBreakTicks",()->parriedGuardBreakTicks,value->parriedGuardBreakTicks=value,GuardPackets.SAVE_SHIELD),
+        new Field<Integer>("parriedStunTicks",()->parriedStunTicks,value->parriedStunTicks=value,GuardPackets.SAVE_SHIELD),
         new Field<Boolean>("parryHealing", () -> parryHealing, value -> parryHealing = value, GuardPackets.SAVE_RULES),
         new Field<Integer>("parryHealingHearts", () -> parryHealingHearts, value -> parryHealingHearts = value, GuardPackets.SAVE_RULES),
         new Field<Integer>("debugFlags", () -> debugFlags, value -> debugFlags = value, 0),
@@ -151,7 +162,7 @@ final class GuardConfigDraft {
         new Field<Boolean>("impactPerfectOnly", () -> impactPerfectOnly, value -> impactPerfectOnly = value, 0),
         new Field<Integer>("flashStrength", () -> flashStrength, value -> flashStrength = value, 0),
         new Field<Integer>("shakeStrength", () -> shakeStrength, value -> shakeStrength = value, 0),
-        new Field<Integer>("hitlagFrames", () -> hitlagFrames, value -> hitlagFrames = value, 0),
+        new Field<Integer>("hitlagTicks", () -> hitlagTicks, value -> hitlagTicks = value, 0),
         new Field<Integer>("impactFrames", () -> impactFrames, value -> impactFrames = value, 0),
         new Field<Integer>("impactBrightness", () -> impactBrightness, value -> impactBrightness = value, 0),
         new Field<Integer>("impactContrast", () -> impactContrast, value -> impactContrast = value, 0),
@@ -179,8 +190,6 @@ final class GuardConfigDraft {
         new Field<Integer>("perfectWear", () -> perfectWear, value -> perfectWear = value, GuardPackets.SAVE_RULES),
         new Field<Integer>("blockWear", () -> blockWear, value -> blockWear = value, GuardPackets.SAVE_RULES),
         new Field<Boolean>("fallParry", () -> fallParry, value -> fallParry = value, GuardPackets.SAVE_RULES),
-        new Field<Boolean>("fallPerfectParry", () -> fallPerfectParry, value -> fallPerfectParry = value, GuardPackets.SAVE_RULES),
-        new Field<Boolean>("fallLookDown", () -> fallLookDown, value -> fallLookDown = value, GuardPackets.SAVE_RULES),
         new Field<Boolean>("fallBreakBlocks", () -> fallBreakBlocks, value -> fallBreakBlocks = value, GuardPackets.SAVE_RULES),
         new Field<Boolean>("parryExplosions", () -> parryExplosions, value -> parryExplosions = value, GuardPackets.SAVE_RULES),
         new Field<Boolean>("perfectExplosionsOnly", () -> perfectExplosionsOnly, value -> perfectExplosionsOnly = value, GuardPackets.SAVE_RULES),

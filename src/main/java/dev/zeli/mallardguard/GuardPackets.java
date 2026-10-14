@@ -16,24 +16,13 @@ public final class GuardPackets {
     private GuardPackets() {}
 
     /** Immutable RGB values; only these cosmetics are accepted from clients. */
-    public record Palette(int flying, int debris, int start, int middle, int end) {
-        public boolean valid() { return flying >= 0 && flying <= 0xFFFFFF && debris >= 0 && debris <= 0xFFFFFF
-            && start >= 0 && start <= 0xFFFFFF && middle >= 0 && middle <= 0xFFFFFF && end >= 0 && end <= 0xFFFFFF; }
-        public static Palette readLocal() {
-            return new Palette(GuardParticleColors.get(GuardParticleColors.BASE), GuardParticleColors.get(GuardParticleColors.DEBRIS_COLOR),
-                GuardParticleColors.get(GuardParticleColors.TRACER_START_COLOR), GuardParticleColors.get(GuardParticleColors.TRACER_MIDDLE_COLOR), GuardParticleColors.get(GuardParticleColors.TRACER_END_COLOR));
-        }
-        public static Palette fromPreset(int[] values) {
-            return new Palette(values[GuardParticleColors.BASE], values[GuardParticleColors.DEBRIS_COLOR],
-                values[GuardParticleColors.TRACER_START_COLOR], values[GuardParticleColors.TRACER_MIDDLE_COLOR], values[GuardParticleColors.TRACER_END_COLOR]);
-        }
+    public record Palette(int flying,int debris,int start,int middle,int end) {
+        public boolean valid(){return flying>=0&&flying<=0xFFFFFF&&debris>=0&&debris<=0xFFFFFF&&start>=0&&start<=0xFFFFFF&&middle>=0&&middle<=0xFFFFFF&&end>=0&&end<=0xFFFFFF;}
+        public static Palette readLocal(){return new Palette(GuardParticleColors.get(GuardParticleColors.BASE),GuardParticleColors.get(GuardParticleColors.DEBRIS_COLOR),GuardParticleColors.get(GuardParticleColors.TRACER_START_COLOR),GuardParticleColors.get(GuardParticleColors.TRACER_MIDDLE_COLOR),GuardParticleColors.get(GuardParticleColors.TRACER_END_COLOR));}
+        public static Palette fromPreset(int[] v){return new Palette(v[GuardParticleColors.BASE],v[GuardParticleColors.DEBRIS_COLOR],v[GuardParticleColors.TRACER_START_COLOR],v[GuardParticleColors.TRACER_MIDDLE_COLOR],v[GuardParticleColors.TRACER_END_COLOR]);}
     }
-    private static void writePalette(RegistryFriendlyByteBuf buf, Palette colors) {
-        buf.writeInt(colors.flying()); buf.writeInt(colors.debris()); buf.writeInt(colors.start()); buf.writeInt(colors.middle()); buf.writeInt(colors.end());
-    }
-    private static Palette readPalette(RegistryFriendlyByteBuf buf) {
-        return new Palette(buf.readInt(), buf.readInt(), buf.readInt(), buf.readInt(), buf.readInt());
-    }
+    private static void writePalette(RegistryFriendlyByteBuf buf,Palette colors){buf.writeInt(colors.flying());buf.writeInt(colors.debris());buf.writeInt(colors.start());buf.writeInt(colors.middle());buf.writeInt(colors.end());}
+    private static Palette readPalette(RegistryFriendlyByteBuf buf){return new Palette(buf.readInt(),buf.readInt(),buf.readInt(),buf.readInt(),buf.readInt());}
     public record SetPalette(Palette colors) implements CustomPacketPayload {
         public static final Type<SetPalette> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "set_palette"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SetPalette> CODEC = StreamCodec.of(
@@ -125,11 +114,11 @@ public final class GuardPackets {
         PacketDistributor.sendToPlayer(player, new SaveResult(data.request(), accepted, error));
     }
 
-    public record Input(boolean pressed, boolean offhand, int hitlagFrames) implements CustomPacketPayload {
+    public record Input(boolean pressed, boolean offhand, int hitlagTicks, long inputId) implements CustomPacketPayload {
         public static final Type<Input> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "input"));
         public static final StreamCodec<RegistryFriendlyByteBuf, Input> CODEC = StreamCodec.of(
-            (buf, data) -> { buf.writeBoolean(data.pressed); buf.writeBoolean(data.offhand); buf.writeVarInt(data.hitlagFrames); },
-            buf -> new Input(buf.readBoolean(), buf.readBoolean(), buf.readVarInt()));
+            (buf, data) -> { buf.writeBoolean(data.pressed); buf.writeBoolean(data.offhand); buf.writeVarInt(data.hitlagTicks); buf.writeVarLong(data.inputId); },
+            buf -> new Input(buf.readBoolean(), buf.readBoolean(), buf.readVarInt(), buf.readVarLong()));
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
@@ -185,7 +174,7 @@ public final class GuardPackets {
 
     public record ShieldSettings(int perfect, int window, int rechargeTicks, int maxBlocks, int toolMaxBlocks, int breakTicks, int cone, int reach,
         int retaliation, int stunTicks, int perfectPushback, int regularPushback, int weaponPushback,
-        String stunnableBosses, boolean consumablePriority, boolean cooldownPreventsGuard, boolean allowEmptyHand, int retaliationCap, int shieldParryPriority, int parryHandPriority, boolean forceCrouchOffhand, String shieldBlacklist, String itemBlockCounts, boolean shieldExpansionActive) implements CustomPacketPayload {
+        String stunnableBosses, boolean consumablePriority, boolean cooldownPreventsGuard, boolean allowEmptyHand, int retaliationCap, int shieldParryPriority, int parryHandPriority, boolean forceCrouchOffhand, String shieldBlacklist, String itemBlockCounts, boolean shieldExpansionActive, boolean parriedEnabled, int parriedGuardBreakTicks, int parriedStunTicks, boolean coneEnabled, int incomingReaction, boolean retaliationEnabled, boolean perfectProjectilesOnly, boolean perfectFallOnly, int perfectKnockbackMultiplier) implements CustomPacketPayload {
         public static final Type<ShieldSettings> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "shield_settings"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ShieldSettings> CODEC = StreamCodec.of(
             GuardPackets::writeShield, GuardPackets::readShield);
@@ -205,13 +194,13 @@ public final class GuardPackets {
         buf.writeVarInt(data.stunTicks()); buf.writeVarInt(data.perfectPushback());
         buf.writeVarInt(data.regularPushback()); buf.writeVarInt(data.weaponPushback());
         buf.writeUtf(data.stunnableBosses(), 1024); buf.writeBoolean(data.consumablePriority()); buf.writeBoolean(data.cooldownPreventsGuard()); buf.writeBoolean(data.allowEmptyHand());
-        buf.writeVarInt(data.retaliationCap()); buf.writeVarInt(data.shieldParryPriority()); buf.writeVarInt(data.parryHandPriority()); buf.writeBoolean(data.forceCrouchOffhand()); buf.writeUtf(data.shieldBlacklist(), GuardItemRules.MAX_LENGTH); buf.writeUtf(data.itemBlockCounts(), GuardItemBlockCounts.MAX_LENGTH); buf.writeBoolean(data.shieldExpansionActive());
+        buf.writeVarInt(data.retaliationCap()); buf.writeVarInt(data.shieldParryPriority()); buf.writeVarInt(data.parryHandPriority()); buf.writeBoolean(data.forceCrouchOffhand()); buf.writeUtf(data.shieldBlacklist(), GuardItemRules.MAX_LENGTH); buf.writeUtf(data.itemBlockCounts(), GuardItemBlockCounts.MAX_LENGTH); buf.writeBoolean(data.shieldExpansionActive());buf.writeBoolean(data.parriedEnabled());buf.writeVarInt(data.parriedGuardBreakTicks());buf.writeVarInt(data.parriedStunTicks());buf.writeBoolean(data.coneEnabled());buf.writeVarInt(data.incomingReaction());buf.writeBoolean(data.retaliationEnabled());buf.writeBoolean(data.perfectProjectilesOnly());buf.writeBoolean(data.perfectFallOnly());buf.writeVarInt(data.perfectKnockbackMultiplier());
     }
 
     private static ShieldSettings readShield(RegistryFriendlyByteBuf buf) {
         return new ShieldSettings(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(),
             buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(),
-            buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readUtf(1024), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readUtf(GuardItemRules.MAX_LENGTH), buf.readUtf(GuardItemBlockCounts.MAX_LENGTH), buf.readBoolean());
+            buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readUtf(1024), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readUtf(GuardItemRules.MAX_LENGTH), buf.readUtf(GuardItemBlockCounts.MAX_LENGTH), buf.readBoolean(),buf.readBoolean(),buf.readVarInt(),buf.readVarInt(),buf.readBoolean(),buf.readVarInt(),buf.readBoolean(),buf.readBoolean(),buf.readBoolean(),buf.readVarInt());
     }
 
     public record MobSettings(boolean enabled, int difficulty, String whitelist, int gearChance, String gearWhitelist, String gearBlacklist, int tracerStartColor, int tracerMiddleColor, int tracerEndColor) implements CustomPacketPayload {
@@ -233,9 +222,14 @@ public final class GuardPackets {
     private static MobSettings readMobs(RegistryFriendlyByteBuf buf) {
         return new MobSettings(buf.readBoolean(),buf.readVarInt(),buf.readUtf(1024),buf.readVarInt(),buf.readUtf(GuardItemRules.MAX_LENGTH),buf.readUtf(GuardItemRules.MAX_LENGTH),buf.readInt(),buf.readInt(),buf.readInt());
     }
-    public record MobCounter(boolean perfect) implements CustomPacketPayload {
+    public record StunState(int ticks) implements CustomPacketPayload {
+        public static final Type<StunState> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID,"stun_state"));
+        public static final StreamCodec<RegistryFriendlyByteBuf,StunState> CODEC=StreamCodec.of((b,d)->b.writeVarInt(d.ticks()),b->new StunState(b.readVarInt()));
+        @Override public Type<? extends CustomPacketPayload> type(){return TYPE;}
+    }
+    public record MobCounter(boolean perfect,int opponentId,boolean stagger,int stunTicks) implements CustomPacketPayload {
         public static final Type<MobCounter> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "mob_counter"));
-        public static final StreamCodec<RegistryFriendlyByteBuf, MobCounter> CODEC = StreamCodec.of((b,d) -> { b.writeBoolean(d.perfect()); }, b -> new MobCounter(b.readBoolean()));
+        public static final StreamCodec<RegistryFriendlyByteBuf, MobCounter> CODEC = StreamCodec.of((b,d) -> { b.writeBoolean(d.perfect());b.writeVarInt(d.opponentId());b.writeBoolean(d.stagger());b.writeVarInt(d.stunTicks()); }, b -> new MobCounter(b.readBoolean(),b.readVarInt(),b.readBoolean(),b.readVarInt()));
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
@@ -263,8 +257,8 @@ public final class GuardPackets {
     public record ClientPolicy(boolean enabled, int dontEnforceMask, String defaults, String animations) implements CustomPacketPayload {
         public static final Type<ClientPolicy> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "client_policy"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ClientPolicy> CODEC = StreamCodec.of(
-            (buf, data) -> { buf.writeBoolean(data.enabled); buf.writeVarInt(data.dontEnforceMask); buf.writeUtf(data.defaults, 2048);buf.writeUtf(data.animations,24576); },
-            buf -> new ClientPolicy(buf.readBoolean(), buf.readVarInt(), buf.readUtf(2048),buf.readUtf(24576)));
+            (buf, data) -> { buf.writeBoolean(data.enabled); buf.writeVarInt(data.dontEnforceMask); buf.writeUtf(data.defaults,8192);buf.writeUtf(data.animations,GuardPoseLibrary.MAX_ANIMATIONS_BYTES); },
+            buf -> new ClientPolicy(buf.readBoolean(), buf.readVarInt(), buf.readUtf(8192),buf.readUtf(GuardPoseLibrary.MAX_ANIMATIONS_BYTES)));
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
@@ -278,24 +272,24 @@ public final class GuardPackets {
     public record SaveClientPolicy(boolean enabled, int dontEnforceMask, String defaults, String animations) implements CustomPacketPayload {
         public static final Type<SaveClientPolicy> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "save_client_policy"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SaveClientPolicy> CODEC = StreamCodec.of(
-            (buf, data) -> { buf.writeBoolean(data.enabled); buf.writeVarInt(data.dontEnforceMask); buf.writeUtf(data.defaults, 2048);buf.writeUtf(data.animations,24576); },
-            buf -> new SaveClientPolicy(buf.readBoolean(), buf.readVarInt(), buf.readUtf(2048),buf.readUtf(24576)));
+            (buf, data) -> { buf.writeBoolean(data.enabled); buf.writeVarInt(data.dontEnforceMask); buf.writeUtf(data.defaults,8192);buf.writeUtf(data.animations,GuardPoseLibrary.MAX_ANIMATIONS_BYTES); },
+            buf -> new SaveClientPolicy(buf.readBoolean(), buf.readVarInt(), buf.readUtf(8192),buf.readUtf(GuardPoseLibrary.MAX_ANIMATIONS_BYTES)));
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
-    public record Status(int phase, int elapsed, int recharge, int window, int rechargeMax, boolean offhand) implements CustomPacketPayload {
+    public record Status(int phase, int elapsed, int recharge, int window, int rechargeMax, boolean offhand, long inputId, boolean accepted, int toolHandRun, boolean toolOffhand) implements CustomPacketPayload {
         public static final Type<Status> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "status"));
         public static final StreamCodec<RegistryFriendlyByteBuf, Status> CODEC = StreamCodec.of(
-            (buf, data) -> { buf.writeVarInt(data.phase); buf.writeVarInt(data.elapsed); buf.writeVarInt(data.recharge); buf.writeVarInt(data.window); buf.writeVarInt(data.rechargeMax); buf.writeBoolean(data.offhand); },
-            buf -> new Status(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean()));
+            (buf, data) -> { buf.writeVarInt(data.phase); buf.writeVarInt(data.elapsed); buf.writeVarInt(data.recharge); buf.writeVarInt(data.window); buf.writeVarInt(data.rechargeMax); buf.writeBoolean(data.offhand); buf.writeVarLong(data.inputId); buf.writeBoolean(data.accepted); buf.writeVarInt(data.toolHandRun); buf.writeBoolean(data.toolOffhand); },
+            buf -> new Status(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readVarLong(), buf.readBoolean(), buf.readVarInt(), buf.readBoolean()));
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
-    public record HitResult(int result, boolean guardBroken, int retaliationToken) implements CustomPacketPayload {
+    public record HitResult(int result, boolean guardBroken, int retaliationToken, long inputId,int opponentId) implements CustomPacketPayload {
         public static final Type<HitResult> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(MallardGuard.ID, "hit_result"));
         public static final StreamCodec<RegistryFriendlyByteBuf, HitResult> CODEC = StreamCodec.of(
-            (buf, data) -> { buf.writeVarInt(data.result); buf.writeBoolean(data.guardBroken); buf.writeVarInt(data.retaliationToken); },
-            buf -> new HitResult(buf.readVarInt(), buf.readBoolean(), buf.readVarInt()));
+            (buf, data) -> { buf.writeVarInt(data.result); buf.writeBoolean(data.guardBroken); buf.writeVarInt(data.retaliationToken); buf.writeVarLong(data.inputId);buf.writeVarInt(data.opponentId); },
+            buf -> new HitResult(buf.readVarInt(), buf.readBoolean(), buf.readVarInt(), buf.readVarLong(),buf.readVarInt()));
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
@@ -423,20 +417,21 @@ public final class GuardPackets {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("68");
+        PayloadRegistrar registrar = event.registrar("75");
         registrar.playToServer(SetPalette.TYPE, SetPalette.CODEC, GuardPlayerPalettes::receivePalette);
         registrar.playToClient(PlayerPalette.TYPE, PlayerPalette.CODEC, (data, context) -> GuardClient.playerPalette(data));
         registrar.playToServer(FeintEnded.TYPE, FeintEnded.CODEC, (data, context) -> {
             if (context.player() instanceof ServerPlayer player) GuardState.feinted(player);
         });
+        registrar.playToClient(StunState.TYPE,StunState.CODEC,(data,context)->GuardClient.stunState(data));
         registrar.playToClient(MobCounter.TYPE, MobCounter.CODEC, (data, context) -> GuardClient.mobCounter(data));
         registrar.playToServer(AttackStarted.TYPE, AttackStarted.CODEC, (data, context) -> {
             if (context.player() instanceof ServerPlayer player) GuardState.attackStarted(player);
         });
         registrar.playToServer(Input.TYPE, Input.CODEC, (data, context) -> {
             if (context.player() instanceof ServerPlayer player) {
-                GuardRetaliation.clientFrames(player, data.hitlagFrames());
-                GuardState.input(player, data.pressed(), data.offhand());
+                GuardRetaliation.clientTicks(player, data.hitlagTicks());
+                GuardState.input(player, data);
             }
         });
         registrar.playToServer(FeedbackComplete.TYPE, FeedbackComplete.CODEC, (data, context) -> {
@@ -486,7 +481,7 @@ public final class GuardPackets {
     public static ClientPolicy clientPolicy() {
         int[] saved = GuardClientPreset.parse(GuardConfig.CLIENT_PRESET.get());
         int[] effective = GuardClientPreset.readEnforceTemplate(saved == null ? GuardClientPreset.DEFAULTS : saved);
-        GuardRetaliation.enforcedFrames(effective[3]);
+        GuardRetaliation.enforcedTicks(effective[GuardScreenSettings.HITLAG_ENABLED]!=0?effective[3]:0);
         GuardPlayerPalettes.enforcePalettes(GuardConfig.ENFORCE_CLIENT.get() && (GuardConfig.CLIENT_EXEMPT_MASK.get() & GuardClientPreset.PARTICLES) == 0, effective);
         return new ClientPolicy(GuardConfig.ENFORCE_CLIENT.get(), GuardConfig.CLIENT_EXEMPT_MASK.get() & GuardClientPreset.ALL_CATEGORIES, GuardClientPreset.encode(effective),GuardPoseLibrary.enforcedAnimations());
     }
@@ -605,6 +600,9 @@ public final class GuardPackets {
             || !GuardSettingRanges.accepts(GuardConfig.SHIELD_RETALIATION_PERCENT, data.retaliation()) || !GuardSettingRanges.accepts(GuardConfig.RETALIATION_CAP, data.retaliationCap())
             || !GuardSettingRanges.accepts(GuardConfig.SHIELD_STUN_TICKS, data.stunTicks()) || !GuardSettingRanges.accepts(GuardConfig.SHIELD_PUSHBACK_PERCENT, data.perfectPushback())
             || !GuardSettingRanges.accepts(GuardConfig.SHIELD_PARRY_PUSHBACK_PERCENT, data.regularPushback()) || !GuardSettingRanges.accepts(GuardConfig.TOOL_PUSHBACK_PERCENT, data.weaponPushback())
+            || !GuardSettingRanges.accepts(GuardConfig.INCOMING_REACTION,data.incomingReaction())
+            || !GuardSettingRanges.accepts(GuardConfig.PERFECT_KNOCKBACK_MULTIPLIER,data.perfectKnockbackMultiplier())
+            || !GuardSettingRanges.accepts(GuardConfig.PARRIED_GUARD_BREAK_TICKS,data.parriedGuardBreakTicks())||!GuardSettingRanges.accepts(GuardConfig.PARRIED_STUN_TICKS,data.parriedStunTicks())
             || !GuardItemRules.validEntityRules(data.stunnableBosses()) || !GuardItemRules.valid(data.shieldBlacklist()) || !GuardItemBlockCounts.valid(data.itemBlockCounts())
             || !GuardSettingRanges.accepts(GuardConfig.PARRY_HAND_PRIORITY, data.parryHandPriority()) || !GuardSettingRanges.accepts(GuardConfig.SHIELD_PARRY_PRIORITY, data.shieldParryPriority())) {
             player.sendSystemMessage(Component.literal("Mallard Guard: Invalid shield settings."));

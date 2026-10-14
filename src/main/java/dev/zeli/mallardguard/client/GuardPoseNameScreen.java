@@ -19,10 +19,10 @@ final class GuardPoseNameScreen extends Screen {
         super(Component.literal("Name Preset"));this.parent=parent;this.name=name;this.poses=poses;this.accept=accept;
     }
     @Override protected void init(){
-        w=Math.min(340,width-24);left=(width-w)/2;top=(height-116)/2;
+        w=Math.min(340,GuardUiLayout.wideWidth(width));left=(width-w)/2;top=Math.max(GuardUiLayout.screenTop(height),(height-116)/2);
         EditBox box=addRenderableWidget(GuardUi.editBox(font,left+8,top+29,w-16,"Preset name"));
         box.setMaxLength(64);box.setValue(name);box.setResponder(value->name=value);
-        box.setTooltip(GuardUi.tooltip("Leave blank for a random unused name."));
+        box.setTooltip(GuardUi.tooltip("Name this preset. Leave blank for a random unused name.\nSaving commits both poses, motion and assignments."));
         addRenderableWidget(GuardUi.button("Randomize Name",left+8,top+53,w-16,18,()->box.setValue(GuardPoseNames.unused(poses))));
         int bw=(w-22)/2;
         addRenderableWidget(GuardUi.button("Save",left+8,top+87,bw,20,()->accept.accept(name.isBlank()?GuardPoseNames.unused(poses):name.strip())));

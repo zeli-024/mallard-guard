@@ -1,7 +1,6 @@
 package dev.zeli.mallardguard;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.Map;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
@@ -10,31 +9,21 @@ import net.neoforged.fml.ModList;
 /** Optional Shield Expansion stats; Mallard Guard remains the sole combat handler. */
 public final class GuardShieldExpansionCompat {
     private static boolean checked,active;
-    private static Field itemOnly,stats,advancedExplosions,hud;
-    private static Method save;
+    private static Field stats,advancedExplosions;
     private GuardShieldExpansionCompat() {}
-    public static synchronized void enable(){
-        if(!checked){
-            checked=true;
-            if(!ModList.get().isLoaded("shieldexp"))return;
-            try{
-                Class<?> config=Class.forName("org.infernalstudios.shieldexp.config.ShieldExpansionConfig");
-                itemOnly=config.getField("ITEM_ONLY_MODE");hud=config.getField("HUD_INDICATOR");save=config.getMethod("save");
-                advancedExplosions=config.getField("ADVANCED_EXPLOSIONS");
-                stats=Class.forName("org.infernalstudios.shieldexp.init.ShieldDataLoader").getField("SHIELD_STATS");
-            }catch(ReflectiveOperationException|LinkageError error){itemOnly=null;stats=null;report(error);return;}
-        }
-        if(itemOnly==null)return;
+    static synchronized boolean initialize(){
+        if(checked)return active;
+        checked=true;
+        if(!ModList.get().isLoaded("shieldexp"))return false;
         try{
-            boolean changed=!itemOnly.getBoolean(null)||hud.getBoolean(null);
-            itemOnly.setBoolean(null,true);hud.setBoolean(null,false);
+            advancedExplosions=Class.forName("org.infernalstudios.shieldexp.config.ShieldExpansionConfig").getField("ADVANCED_EXPLOSIONS");
+            stats=Class.forName("org.infernalstudios.shieldexp.init.ShieldDataLoader").getField("SHIELD_STATS");
             active=true;
-            if(changed)save.invoke(null);
-        }catch(ReflectiveOperationException|LinkageError error){active=false;report(error);}
+        }catch(ReflectiveOperationException|LinkageError error){report(error);}
+        return active;
     }
-    private static void report(Throwable error){org.slf4j.LoggerFactory.getLogger(MallardGuard.ID).warn("Shield Expansion compatibility could not be enabled; keeping ordinary Mallard Guard settings.",error);}
-    public static void setup(net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent event){event.enqueueWork(GuardShieldExpansionCompat::enable);}
-    public static void serverStarted(net.neoforged.neoforge.event.server.ServerStartedEvent event){enable();}
+    static void disable(){active=false;}
+    private static void report(Throwable error){org.slf4j.LoggerFactory.getLogger(MallardGuard.ID).warn("Shield Expansion stats are unavailable; using ordinary Mallard Guard settings.",error);}
     public static boolean active(){return active;}
     private static double value(ItemStack stack,String key,double fallback){
         if(!active || stack.isEmpty())return fallback;

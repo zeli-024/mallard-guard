@@ -31,6 +31,7 @@ final class GuardImpactFrame {
         uniform int invert;
         uniform float chromatic;
         uniform int colorMode;
+        uniform vec3 highlightColor;
         in vec2 uv;
         out vec4 result;
         float luminance(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -58,6 +59,22 @@ final class GuardImpactFrame {
             return invert == 1 ? 1.0 - ink : ink;
         }
         void main() {
+            if (colorMode == 4) {
+                vec3 original=texture(scene,uv).rgb;
+                float silhouette=texture(clean,uv).a;
+                vec3 world=original*(1.0-clamp(edges,0.0,1.0)*chromatic*(1.0-silhouette));
+                world=mix(world,original,silhouette*chromatic);
+                if(roughness>0.0){
+                    vec2 pixel=vec2(1.0)/dimensions;
+                    float interior=silhouette;
+                    for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++)interior=min(interior,texture(clean,clamp(uv+vec2(x,y)*pixel,vec2(0.0),vec2(1.0))).a);
+                    float edge=max(0.0,silhouette-interior);
+                    float tint=(silhouette*0.35+edge*0.65)*roughness*chromatic;
+                    world=mix(world,max(original,highlightColor),clamp(tint,0.0,1.0));
+                }
+                result=vec4(world,1.0);return;
+            }
+            if (colorMode == 5) { result=vec4(texture(scene,uv).rgb*(1.0-clamp(edges,0.0,1.0)*chromatic),1.0);return; }
             if (colorMode == 3) { result = mix(texture(clean, uv), texture(scene, uv), chromatic); return; }
             if (colorMode == 2) {
                 vec2 stepSize = vec2(5.0) / dimensions;
@@ -79,7 +96,7 @@ final class GuardImpactFrame {
         """;
     private static int program;
     private static int vertexArray;
-    private static int uniformClean, uniformScene, uniformInvert, uniformColorMode, uniformChromatic, uniformDimensions, uniformBrightness, uniformContrast, uniformEdges, uniformRoughness;
+    private static int uniformHighlightColor, uniformClean, uniformScene, uniformInvert, uniformColorMode, uniformChromatic, uniformDimensions, uniformBrightness, uniformContrast, uniformEdges, uniformRoughness;
     private static boolean unavailable;
 
     private GuardImpactFrame() {}
@@ -94,7 +111,7 @@ final class GuardImpactFrame {
             (separate ? dev.zeli.mallardguard.GuardConfig.MOB_IMPACT_EDGES : dev.zeli.mallardguard.GuardConfig.IMPACT_EDGES).get(),
             (separate ? dev.zeli.mallardguard.GuardConfig.MOB_IMPACT_GRAIN : dev.zeli.mallardguard.GuardConfig.IMPACT_GRAIN).get(),
             (separate ? dev.zeli.mallardguard.GuardConfig.MOB_IMPACT_CHROMATIC : dev.zeli.mallardguard.GuardConfig.IMPACT_CHROMATIC).get(),
-            mob && dev.zeli.mallardguard.GuardConfig.MOB_IMPACT_INVERT.get());
+            mob ? dev.zeli.mallardguard.GuardConfig.MOB_IMPACT_INVERT.get() : dev.zeli.mallardguard.GuardScreenSettings.enabled(dev.zeli.mallardguard.GuardScreenSettings.PLAYER_IMPACT_INVERT));
     }
 
     static boolean draw(RenderTarget source, RenderTarget destination, int brightness, int contrast, int edges, int roughness, int chromatic, boolean invert) {
@@ -106,10 +123,16 @@ final class GuardImpactFrame {
     static boolean drawBlur(RenderTarget source, RenderTarget destination) {
         return render(source, destination, 100, 100, 0, 0, 1, false, 2, null);
     }
+    static boolean drawHighlight(RenderTarget source,RenderTarget mask,RenderTarget destination,float amount,int dim,int glow,int color){
+        return render(source,destination,100,100,dim,glow,amount,false,mask==null?5:4,mask,color);
+    }
     static boolean drawMix(RenderTarget source, RenderTarget clean, RenderTarget destination, float opacity) {
         return render(source, destination, 100, 100, 0, 0, opacity, false, 3, clean);
     }
     private static boolean render(RenderTarget source, RenderTarget destination, int brightness, int contrast, int edges, int roughness, float chromatic, boolean invert, int colorMode, RenderTarget clean) {
+        return render(source,destination,brightness,contrast,edges,roughness,chromatic,invert,colorMode,clean,0xFFFFFF);
+    }
+    private static boolean render(RenderTarget source, RenderTarget destination, int brightness, int contrast, int edges, int roughness, float chromatic, boolean invert, int colorMode, RenderTarget clean,int color) {
         if (!ensureShader()) return false;
         int previousRead = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
         int previousDraw = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
@@ -136,6 +159,7 @@ final class GuardImpactFrame {
             GL30.glBindVertexArray(vertexArray);
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, source.getColorTextureId());
             GL20.glUniform1i(uniformScene, 0);
+            GL20.glUniform3f(uniformHighlightColor,(color>>16&255)/255F,(color>>8&255)/255F,(color&255)/255F);
             if (clean != null) { GL13.glActiveTexture(GL13.GL_TEXTURE1); GL11.glBindTexture(GL11.GL_TEXTURE_2D, clean.getColorTextureId()); GL20.glUniform1i(uniformClean, 1); GL13.glActiveTexture(GL13.GL_TEXTURE0); }
             GL20.glUniform1i(uniformInvert, invert ? 1 : 0);
             GL20.glUniform1i(uniformColorMode, colorMode);
@@ -187,6 +211,7 @@ final class GuardImpactFrame {
         }
         program = candidate;
         uniformScene = GL20.glGetUniformLocation(program, "scene");
+        uniformHighlightColor=GL20.glGetUniformLocation(program,"highlightColor");
         uniformClean = GL20.glGetUniformLocation(program, "clean");
         uniformInvert = GL20.glGetUniformLocation(program, "invert");
         uniformColorMode = GL20.glGetUniformLocation(program, "colorMode");

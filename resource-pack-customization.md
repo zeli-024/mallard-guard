@@ -9,7 +9,6 @@ All paths below are inside `assets/mallardguard/` in a resource pack. Replace as
 | Shield HUD icons | 2 PNGs | `textures/gui/shield.png`, `textures/gui/shield_red.png` |
 | Spark Debris point | 1 PNG | `textures/particle/dot_streak_point.png` |
 | Spark Tracer point | 1 PNG | `textures/particle/shooting_spark_point.png` |
-| Block vignette | 1 PNG | `textures/gui/block_vignette.png` |
 | Meme flashes | 4 PNGs | `textures/gui/meme_flash_1.png`, `meme_flash_2.png`, `meme_flash_3.png`, `meme_flash_plankton.png` |
 | Config-menu logo | 1 PNG | `textures/gui/mod_logo.png` |
 | Audio | 50 OGGs and 1 JSON | `sounds/` and `sounds.json`; 25 recordings and their 25 boosted alternatives |

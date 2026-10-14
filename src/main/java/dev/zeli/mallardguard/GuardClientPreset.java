@@ -12,7 +12,7 @@ public final class GuardClientPreset {
     public static final int PARTICLES = 1, HUD = 2, AUDIO = 4, SCREEN=8, ANIMATIONS=16, PUNCHY = 32;
     public static final int[] CATEGORIES = {PARTICLES, HUD, AUDIO, SCREEN, ANIMATIONS, PUNCHY};
     public static final int ALL_CATEGORIES = 63;
-    public static final int[] DEFAULTS = GuardPoseSettings.appendMotion(GuardShieldReactions.append(GuardPoseSettings.appendDefaults(GuardClientSettings.defaults()),false),false);
+    public static final int[] DEFAULTS = GuardScreenSettings.append(GuardPoseSettings.appendMotion(GuardShieldReactions.append(GuardPoseSettings.appendDefaults(GuardClientSettings.defaults()),false),false),false);
     static final int[] MIN = GuardClientSettings.minimums();
     static final int[] MAX = GuardClientSettings.maximums();
 
@@ -44,8 +44,7 @@ public final class GuardClientPreset {
             }
             GuardShieldReactions.readTemplate(config,values);
             GuardSparkTracerConfig.read(config,values);
-            GuardParticleColors.read(config,values);
-            if(config.get("display.regularHitlagFrames")==null)values[62]=GuardClientSettings.legacyRegularHitlag(config);
+            GuardParticleColors.read(config,values);GuardScreenSettings.read(config,values);
             Number particleRevision=config.get("configRevision");if(particleRevision==null||particleRevision.intValue()<70){
                 GuardParticleConfig.migratePerfect(values);
                 if(config.get("particles.flyingSparks.perfectIntensity")==null)values[17]=DEFAULTS[17];
@@ -86,7 +85,7 @@ public final class GuardClientPreset {
                     if (!GuardParticleConfig.slot(i) && TEMPLATE_KEYS[i] != null && config.contains(TEMPLATE_KEYS[i])) values[i] = GuardPresetMigration.clampLegacy(i, values[i]);
                 }
             }
-            if (Boolean.FALSE.equals(config.get("display.screenShake"))) values[5] = 0;
+
             return values;
         } catch (RuntimeException error) {
             System.err.println("Mallard Guard: could not load enforce template: " + error.getMessage());
@@ -122,7 +121,7 @@ public final class GuardClientPreset {
                 for(String legacy:new String[]{"raiseMillis","lowerMillis","curve","strength"})profile.remove(legacy);
                 profile.save();
             }
-            config.set("display.screenShake", values[5] > 0);
+            GuardScreenSettings.write(config,values);
             config.set("configRevision", GuardConfig.CONFIG_REVISION);
             config.save();
             GuardConfig.clearBackups(path.getParent());
@@ -134,6 +133,7 @@ public final class GuardClientPreset {
     }
 
     public static String settingName(int index) {
+        if(GuardScreenSettings.slot(index))return GuardScreenSettings.key(index);
         if(GuardParticleColors.retired(index))return "Retired particle setting";
         if(GuardParticleColors.slot(index))return GuardParticleColors.key(index);
         if(GuardSparkTracerConfig.retired(index))return "Retired particle setting";
@@ -155,6 +155,7 @@ public final class GuardClientPreset {
     public static boolean valid(String text) { return parse(text) != null; }
 
     public static int categoryOf(int index) {
+        if(GuardScreenSettings.slot(index))return GuardScreenSettings.category(index);
         if(GuardParticleColors.slot(index) || GuardSparkTracerConfig.slot(index) || GuardParticleConfig.legacySlot(index))return PARTICLES;
         if(index==GuardPoseSettings.RELEASE_DELAY_SLOT)return PUNCHY;
         if (index >= GuardShieldReactions.OFFSET) return HUD;
@@ -162,12 +163,12 @@ public final class GuardClientPreset {
         return GuardClientSettings.category(index);
     }
     public static int[] readLocal() {
-        return GuardPoseSettings.appendMotion(GuardShieldReactions.append(GuardPoseSettings.appendLocal(GuardClientSettings.readLocal()), true),true);
+        return GuardScreenSettings.append(GuardPoseSettings.appendMotion(GuardShieldReactions.append(GuardPoseSettings.appendLocal(GuardClientSettings.readLocal()), true),true),true);
     }
     public static void apply(int[] values, int category) {
         if (category == PUNCHY) { GuardPoseSettings.apply(values); }
         else {
-            GuardClientSettings.apply(values, category);
+            GuardClientSettings.apply(values, category);GuardScreenSettings.apply(values,category);
             if(category==PARTICLES){GuardSparkTracerConfig.apply(values);GuardParticleColors.apply(values);}
             if (category == HUD) GuardShieldReactions.apply(values);
         }

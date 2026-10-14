@@ -9,6 +9,21 @@ import net.minecraft.world.item.ItemStack;
 /** Exact item overrides, followed by compatibility values and ordinary guard limits. */
 public final class GuardItemBlockCounts {
     public static final int MAX_COUNT = 100, MAX_LENGTH = GuardItemRules.MAX_LENGTH;
+    /** Tracks the serialized budget without encoding the entire map on every typed count. */
+    public static final class Draft extends java.util.AbstractMap<String,Integer> {
+        private final LinkedHashMap<String,Integer> entries=new LinkedHashMap<>();
+        private int characters;
+        private static int width(String id,int count){return id.length()+1+Integer.toString(count).length();}
+        @Override public Integer put(String id,Integer count){Integer old=entries.put(id,count);characters+=width(id,count)-(old==null?(size()>1?-1:0):width(id,old));return old;}
+        @Override public Integer remove(Object id){Integer old=entries.remove(id);if(old!=null)characters-=width((String)id,old)+(isEmpty()?0:1);return old;}
+        @Override public void clear(){entries.clear();characters=0;}
+        @Override public void putAll(Map<? extends String,? extends Integer> values){values.forEach(this::put);}
+        @Override public int size(){return entries.size();}
+        @Override public Integer get(Object id){return entries.get(id);}
+        @Override public boolean containsKey(Object id){return entries.containsKey(id);}
+        @Override public java.util.Set<Map.Entry<String,Integer>> entrySet(){return java.util.Collections.unmodifiableMap(entries).entrySet();}
+        public int encodedLength(){return characters;}
+    }
     private static String cachedText;
     private static Map<String,Integer> cached = Map.of();
     private GuardItemBlockCounts() {}

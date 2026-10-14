@@ -6,20 +6,17 @@ final class GuardSparkTrail {
     final int[] born;
     final float[] cooling;
     private final double[] bounds;
-    final int capacity,squaresPerGroup;
+    final int squaresPerGroup;
     private final int groupCapacity;
     int count,groups;
     private int cursor;
     double minX,minY,minZ,maxX,maxY,maxZ;
     GuardSparkTrail(int squares,int lifetime,int headLifetime) {
         squaresPerGroup=squares;groupCapacity=Math.min(headLifetime,lifetime+1);
-        capacity=squares*groupCapacity;
+        int capacity=squares*groupCapacity;
         points=new double[capacity*3];born=new int[groupCapacity];cooling=new float[groupCapacity];bounds=new double[groupCapacity*6];
     }
     int groupIndex(int chronological) { return (cursor-groups+chronological+groupCapacity)%groupCapacity; }
-    int index(int chronological) { return groupIndex(chronological/squaresPerGroup)*squaresPerGroup+chronological%squaresPerGroup; }
-    int birth(int pointSlot) { return born[pointSlot/squaresPerGroup]; }
-    float colorProgress(int pointSlot) { return cooling[pointSlot/squaresPerGroup]; }
     void expire(double now,int lifetime) {
         boolean changed=false;
         while(groups>0 && now-born[groupIndex(0)]>=lifetime){groups--;count-=squaresPerGroup;changed=true;}

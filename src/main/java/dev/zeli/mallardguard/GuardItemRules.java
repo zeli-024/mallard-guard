@@ -15,14 +15,14 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.entity.player.Player;
 
 public final class GuardItemRules {
-    public static final int MAX_LENGTH=262_144;
+    public static final int MAX_LENGTH=2_097_152;
     private GuardItemRules() {}
 
     private static final TagKey<Item> COMMON_SHIELDS = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "tools/shields"));
     private static final TagKey<Item> FORGE_SHIELDS = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("forge", "shields"));
-    private record Rule(ResourceLocation id, TagKey<Item> tag,String namespace,String keyword,boolean exclude) {}
+    private record Rule(ResourceLocation id, TagKey<Item> tag,String namespace,String keyword) {}
     // Bound the cache because item rules may also come from a remote server.
-    private record Rules(java.util.Set<ResourceLocation> included,java.util.Set<ResourceLocation> excluded,java.util.List<Rule> groups) {}
+    private record Rules(java.util.Set<ResourceLocation> included,java.util.Set<ResourceLocation> excluded,java.util.List<Rule> includedGroups,java.util.List<Rule> excludedGroups) {}
     private static int cachedCharacters;
     private static final int CACHE_CHARACTERS=524_288;
     private static final java.util.Map<String, Rules> RULES = new java.util.LinkedHashMap<>(64, 0.75F, true);
@@ -55,20 +55,18 @@ public final class GuardItemRules {
     public static void clearServerRules() { SERVER_INCLUDED.clear();SERVER_EXCLUDED.clear();SERVER_SHIELDS.clear();SERVER_SHIELD_BLACKLIST.clear(); }
 
     public static Compiled compile(String text) {
-        java.util.List<Rule> parsed = new java.util.ArrayList<>();
-        for (String entry : text.split(",")) {
-            String value=entry.trim().toLowerCase(java.util.Locale.ROOT);
-            boolean exclude=value.startsWith("!");if(exclude)value=value.substring(1);
-            if(value.startsWith("@")){parsed.add(new Rule(null,null,value.substring(1),null,exclude));continue;}
-            if(!value.startsWith("#")&&!value.contains(":")){if(!value.isBlank())parsed.add(new Rule(null,null,null,value,exclude));continue;}
-            boolean tag=value.startsWith("#");ResourceLocation id=ResourceLocation.tryParse(tag?value.substring(1):value);
-            if(id!=null)parsed.add(new Rule(id,tag?TagKey.create(Registries.ITEM,id):null,null,null,exclude));
-        }
         var included=new java.util.HashSet<ResourceLocation>();var excluded=new java.util.HashSet<ResourceLocation>();
-        var groups=new java.util.ArrayList<Rule>();
-        for(Rule rule:parsed){if(rule.id()!=null&&rule.tag()==null)(rule.exclude()?excluded:included).add(rule.id());else groups.add(rule);}
-        Rules rules = new Rules(java.util.Set.copyOf(included),java.util.Set.copyOf(excluded),java.util.List.copyOf(groups));
-        return new Compiled(rules);
+        var positive=new java.util.ArrayList<Rule>();var negative=new java.util.ArrayList<Rule>();
+        for(String entry:text.split(",")){
+            String value=entry.trim().toLowerCase(java.util.Locale.ROOT);boolean except=value.startsWith("!");if(except)value=value.substring(1);
+            Rule rule;
+            if(value.startsWith("@"))rule=new Rule(null,null,value.substring(1),null);
+            else if(!value.startsWith("#")&&!value.contains(":")){if(value.isBlank())continue;rule=new Rule(null,null,null,value);}
+            else{boolean tag=value.startsWith("#");ResourceLocation id=ResourceLocation.tryParse(tag?value.substring(1):value);if(id==null)continue;
+                if(!tag){(except?excluded:included).add(id);continue;}rule=new Rule(id,TagKey.create(Registries.ITEM,id),null,null);}
+            (except?negative:positive).add(rule);
+        }
+        return new Compiled(new Rules(java.util.Set.copyOf(included),java.util.Set.copyOf(excluded),java.util.List.copyOf(positive),java.util.List.copyOf(negative)));
     }
     // Transient callers still have a bounded cache; active policies hold their own compiled lists.
     private static synchronized Rules parsedRules(String text) {
@@ -110,10 +108,7 @@ public final class GuardItemRules {
         return false;
     }
 
-    public static boolean simplySwordsWeapon(ItemStack stack) {
-        return !stack.isEmpty() && !shieldLike(stack) && hasAttackDamage(stack)
-            && BuiltInRegistries.ITEM.getKey(stack.getItem()).getNamespace().equals("simplyswords");
-    }
+
 
     public static boolean consumableInEitherHand(Player player) {
         return consumable(player.getMainHandItem()) || consumable(player.getOffhandItem());
@@ -128,18 +123,18 @@ public final class GuardItemRules {
     public static boolean matches(ItemStack stack, String rules) {
         return !rules.isBlank() && matchesCompiled(stack,parsedRules(rules));
     }
-    private static boolean matchesCompiled(ItemStack stack,Rules parsed) {
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        if(parsed.excluded().contains(itemId))return false;
-        boolean included=parsed.included().contains(itemId);
-        for(Rule rule:parsed.groups()){
-            // Check live tag membership; matching exceptions take precedence regardless of order.
-            boolean match=rule.namespace()!=null?rule.namespace().equals(itemId.getNamespace())
-                :rule.keyword()!=null?itemId.toString().contains(rule.keyword())||stack.getTags().anyMatch(tag->tag.location().toString().contains(rule.keyword()))
-                :rule.tag()==null?rule.id().equals(itemId):stack.is(rule.tag());
-            if(match){if(rule.exclude())return false;included=true;}
-        }
-        return included;
+    private static boolean ruleMatches(ItemStack stack,ResourceLocation itemId,Rule rule){
+        return rule.namespace()!=null?rule.namespace().equals(itemId.getNamespace())
+            :rule.keyword()!=null?itemId.toString().contains(rule.keyword())||stack.getTags().anyMatch(tag->tag.location().toString().contains(rule.keyword())):stack.is(rule.tag());
+    }
+    private static boolean matchesCompiled(ItemStack stack,Rules parsed){
+        ResourceLocation id=BuiltInRegistries.ITEM.getKey(stack.getItem());
+        if(parsed.excluded().contains(id))return false;
+        // Exceptions always win; positive exact lookups avoid scanning unrelated positive groups.
+        for(Rule rule:parsed.excludedGroups())if(ruleMatches(stack,id,rule))return false;
+        if(parsed.included().contains(id))return true;
+        for(Rule rule:parsed.includedGroups())if(ruleMatches(stack,id,rule))return true;
+        return false;
     }
 
     public static boolean validEntityRules(String rules){

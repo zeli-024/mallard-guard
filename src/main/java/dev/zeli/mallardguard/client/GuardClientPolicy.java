@@ -11,7 +11,7 @@ final class GuardClientPolicy {
     private static int dontEnforceMask;
     private static int[] policyDefaults = GuardClientPreset.DEFAULTS.clone(), personalDefaults;
     public static boolean clientCategoryLocked(int category) {
-        return policyEnabled && (dontEnforceMask & category) == 0;
+        return category!=0 && policyEnabled && (dontEnforceMask & category) == 0;
     }
 
     private static String policyAnimations="";

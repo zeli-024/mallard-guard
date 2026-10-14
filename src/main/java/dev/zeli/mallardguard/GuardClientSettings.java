@@ -15,8 +15,8 @@ public final class GuardClientSettings {
     private static final Slot[] SLOTS = {
         new Slot("display.hud", 2, 1, 0, 1, true, () -> GuardConfig.HUD),
         new Slot("display.shieldEffects", 2, 1, 0, 1, true, () -> GuardConfig.SHIELD_EFFECTS),
-        new Slot("display.screenFlash", 8, 1, 0, 1, true, () -> GuardConfig.SCREEN_FLASH),
-        new Slot("display.hitlagFrames", 8, 6, 0, 10, false, () -> GuardConfig.HITLAG_FRAMES),
+        new Slot("display.screenFlash", 8, 0, 0, 1, true, () -> GuardConfig.SCREEN_FLASH),
+        new Slot("display.hitlagTicks", 8, 3, 0, 30, false, () -> GuardConfig.HITLAG_TICKS),
         new Slot("display.flashStrength", 8, 100, 0, 100, false, () -> GuardConfig.FLASH_STRENGTH),
         new Slot("display.shakeStrength", 8, 100, 0, 100, false, () -> GuardConfig.SHAKE_STRENGTH),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
@@ -29,12 +29,12 @@ public final class GuardClientSettings {
         new Slot("audio.parryVolume", 4, 65, 0, 200, false, () -> GuardConfig.LOCAL_PARRY_VOLUME),
         new Slot("audio.perfectVolume", 4, 130, 0, 200, false, () -> GuardConfig.LOCAL_PERFECT_VOLUME),
         new Slot("audio.blockVolume", 4, 65, 0, 200, false, () -> GuardConfig.LOCAL_BLOCK_VOLUME),
-        new Slot("particles.flyingSparks.baseIntensity", 1, 5, 0, 100, false, () -> GuardParticleConfig.FLYING_BASE_INTENSITY),
-        new Slot("particles.flyingSparks.perfectIntensity", 1, 50, 0, 100, false, () -> GuardParticleConfig.FLYING_PERFECT_INTENSITY),
-        new Slot("particles.flyingSparks.damageScaling", 1, 5, 0, 100, false, () -> GuardParticleConfig.FLYING_DAMAGE_SCALING),
-        new Slot("particles.dotStreaks.baseIntensity", 1, 5, 0, 100, false, () -> GuardParticleConfig.DEBRIS_BASE_INTENSITY),
-        new Slot("particles.dotStreaks.perfectIntensity", 1, 50, 0, 100, false, () -> GuardParticleConfig.DEBRIS_PERFECT_INTENSITY),
-        new Slot("particles.dotStreaks.damageScaling", 1, 5, 0, 100, false, () -> GuardParticleConfig.DEBRIS_DAMAGE_SCALING),
+        new Slot("particles.flyingSparks.baseIntensity", 1, 8, 0, 100, false, () -> GuardParticleConfig.FLYING_BASE_INTENSITY),
+        new Slot("particles.flyingSparks.perfectIntensity", 1, 32, 0, 100, false, () -> GuardParticleConfig.FLYING_PERFECT_INTENSITY),
+        new Slot("particles.flyingSparks.damageScaling", 1, 2, 0, 100, false, () -> GuardParticleConfig.FLYING_DAMAGE_SCALING),
+        new Slot("particles.dotStreaks.baseIntensity", 1, 8, 0, 100, false, () -> GuardParticleConfig.DEBRIS_BASE_INTENSITY),
+        new Slot("particles.dotStreaks.perfectIntensity", 1, 32, 0, 100, false, () -> GuardParticleConfig.DEBRIS_PERFECT_INTENSITY),
+        new Slot("particles.dotStreaks.damageScaling", 1, 2, 0, 100, false, () -> GuardParticleConfig.DEBRIS_DAMAGE_SCALING),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
         new Slot("display.memeFlash", 8, 0, 0, 1, true, () -> GuardConfig.MEME_FLASH),
@@ -47,7 +47,7 @@ public final class GuardClientSettings {
         new Slot(null, 1, 0, 0, 0, false, () -> null),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
-        new Slot("display.impactFrames", 8, 1, 0, 1, false, () -> GuardConfig.IMPACT_FRAMES),
+        new Slot("display.impactFrames", 8, 0, 0, 1, false, () -> GuardConfig.IMPACT_FRAMES),
         new Slot("display.impactPerfectOnly", 8, 1, 0, 1, true, () -> GuardConfig.IMPACT_PERFECT_ONLY),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
@@ -75,7 +75,7 @@ public final class GuardClientSettings {
         new Slot("display.chromaticTicks", 8, 6, 1, 40, false, () -> GuardConfig.CHROMATIC_TICKS),
         new Slot("display.chromaticPerfectOnly", 8, 0, 0, 1, true, () -> GuardConfig.CHROMATIC_PERFECT_ONLY),
         new Slot("display.chromaticHud", 8, 1, 0, 1, true, () -> GuardConfig.CHROMATIC_HUD),
-        new Slot("display.regularHitlagFrames", 8, 0, 0, 10, false, () -> GuardConfig.REGULAR_HITLAG_FRAMES),
+        new Slot("display.regularHitlagTicks", 8, 1, 0, 30, false, () -> GuardConfig.REGULAR_HITLAG_TICKS),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
         new Slot(null, 1, 0, 0, 0, false, () -> null),
     };
@@ -83,7 +83,7 @@ public final class GuardClientSettings {
     static int legacyRegularHitlag(com.electronwill.nightconfig.core.Config previous) {
         Object frames=previous.get("display.hitlagFrames");
         return Boolean.FALSE.equals(previous.get("display.perfectOnlyHitlag"))
-            ? Math.clamp(frames instanceof Number n?n.intValue():initial(3),0,10):0;
+            ? Math.clamp(frames instanceof Number n?(int)Math.round(n.doubleValue()/3):initial(3),0,30):0;
     }
     public static int count() { return SLOTS.length; }
     public static String key(int index) { return SLOTS[index].key(); }
@@ -121,7 +121,7 @@ public final class GuardClientSettings {
             Object value = setting.get();
             values[i] = value instanceof Boolean enabled ? enabled ? 1 : 0 : (int)Math.round(((Number)value).doubleValue()*scale(i));
         }
-        if (!GuardConfig.SCREEN_SHAKE.get()) values[5] = 0;
+
         return values;
     }
     @SuppressWarnings("unchecked")
@@ -135,7 +135,7 @@ public final class GuardClientSettings {
             else if(slot.scale()!=1) ((ModConfigSpec.ConfigValue<Double>) setting).set(values[i]/(double)slot.scale());
             else ((ModConfigSpec.ConfigValue<Integer>) setting).set(values[i]);
         }
-        if (category == GuardClientPreset.SCREEN) GuardConfig.SCREEN_SHAKE.set(values[5] > 0);
+
     }
     public static ModConfigSpec.ConfigValue<?> setting(int index) { return SLOTS[index].value().get(); }
 

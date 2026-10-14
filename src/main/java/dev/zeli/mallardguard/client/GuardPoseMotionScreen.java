@@ -12,28 +12,43 @@ final class GuardPoseMotionScreen extends Screen {
     private final Consumer<GuardPoseLibrary.Pose> accept;
     private final GuardPoseLibrary.Pose original;
     private GuardPoseLibrary.Pose draft;
-    private int left,top,w;
-    GuardPoseMotionScreen(Screen parent,GuardPoseLibrary.Pose pose,Consumer<GuardPoseLibrary.Pose> accept){super(Component.literal("Motion Values"));this.parent=parent;this.original=pose.copy();this.draft=pose.copy();this.accept=accept;}
+    private GuardUiLayout.PoseBrowser layout;
+    private boolean parried;
+    private int[] values(){return parried?draft.parriedValues:draft.values;}
+    private int[] originalValues(){return parried?original.parriedValues:original.values;}
+    GuardPoseMotionScreen(Screen parent,GuardPoseLibrary.Pose pose,Consumer<GuardPoseLibrary.Pose> accept){super(Component.literal("Preset Timing"));this.parent=parent;this.original=pose.copy();this.draft=pose.copy();this.accept=accept;}
     private void rebuild(){clearWidgets();init();}
     @Override protected void init(){
-        w=Math.min(360,width-24);left=(width-w)/2;top=Math.max(4,(height-172)/2);
-        slider("Enter",19,500,top+27,"Time to move into guard, in milliseconds.\nDrag: 10 ms; scroll: 1 ms; Shift-scroll: 10 ms.");
-        slider("Return",20,500,top+51,"Return transition time in milliseconds.\nA newer animation can interrupt it.");
-        slider("Ease Strength",22,200,top+75,"Strength of the easing curve, 0–200%.");
-        int bw=(w-22)/2;
-        addRenderableWidget(GuardUi.button("Easing: "+new String[]{"Linear","Ease In","Ease Out","Ease In/Out"}[draft.values[21]],left+8,top+99,bw,20,()->{draft.values[21]=(draft.values[21]+1)%4;rebuild();}));
-        addRenderableWidget(GuardUi.button("Hold: "+(draft.maintainHeld?"On":"Off"),left+14+bw,top+99,bw,20,()->{draft.maintainHeld=!draft.maintainHeld;rebuild();})).setTooltip(GuardUi.tooltip("On maintains the pose while guarding. Off plays entry and return once."));
-        addRenderableWidget(GuardUi.button("?",left+w-30,top+4,22,18,()->GuardUi.choices(this,"Motion Help","TIMING\nEnter blends into guard; Return blends back out.\nA newer animation interrupts the current one.\n\nTUNING\nDrag timing in 10 ms steps. Scroll for 1 ms; Shift-scroll for 10 ms.\nEasing changes the curve. Hold maintains the pose while guarding.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)))));
-        int action=(w-22)/2;
-        addRenderableWidget(GuardUi.button("Save",left+8,top+140,action,20,()->accept.accept(draft.copy())));
-        addRenderableWidget(GuardUi.button("Close",left+14+action,top+140,action,20,this::onClose));
+        layout=GuardUiLayout.poseBrowser(width,height);
+        int x=layout.x(),inner=layout.inner(),col=(inner-6)/2,right=x+col+6,y=layout.top()+66;
+        for(int i=0;i<2;i++){final boolean stage=i==1;addRenderableWidget(GuardUi.tab(stage?"Parried":"Guarding",i==0?x:right,layout.searchY(),i==0?col:inner-col-6,stage==parried,()->{parried=stage;rebuild();}));}
+        slider(parried?"Recoil Time":"Entry Time",19,500,x,y,col,"Time to reach this pose. 0 ms switches immediately.\nDrag: 10 ms; scroll: 1 ms; Shift-scroll: 10 ms.");
+        if(parried){
+            var hold=addRenderableWidget(new GuardSlider(right,y,inner-col-6,20,draft.parriedHoldMs,0,500,GuardUi.dragStep(0,500,1),value->"Hold Time: "+value+" ms",value->draft.parriedHoldMs=value,()->draft.parriedHoldMs!=original.parriedHoldMs));
+            hold.setTooltip(GuardUi.tooltip("Wait at recoil before returning. Recoil begins after hitlag.\nNewer animations can replace the pose."));
+        }else addRenderableWidget(GuardUi.button("Hold While Guarding: "+GuardUi.enabledLabel(draft.maintainHeld),right,y,inner-col-6,20,()->{draft.maintainHeld=!draft.maintainHeld;rebuild();})).setTooltip(GuardUi.tooltip("On maintains the pose until guarding ends.\nOff plays entry and return once."));
+        slider("Return Time",20,500,x,y+26,col,"Time to return to rest. Newer animations can replace it.");
+        addRenderableWidget(GuardUi.button("Movement: "+new String[]{"Constant","Slow Start","Slow Finish","Smooth"}[values()[21]],right,y+26,inner-col-6,20,()->GuardUi.choices(this,"Movement Curve","Choose how the transition changes speed.",new GuardUi.Choice("Constant Speed",()->setCurve(0)),new GuardUi.Choice("Slow Start",()->setCurve(1)),new GuardUi.Choice("Slow Finish",()->setCurve(2)),new GuardUi.Choice("Smooth Start & Finish",()->setCurve(3))))).setTooltip(GuardUi.tooltip("Movement curve for entering and returning."));
+        slider("Curve Amount",22,200,x,y+52,inner,"Curve strength from 0 to 200%. Constant Speed ignores this value.");
+        addRenderableWidget(GuardUi.button("Undo Both Tabs",x,y+80,inner,20,()->{draft=original.copy();rebuild();})).setTooltip(GuardUi.tooltip("Restore guarding and parried timing to their values when this screen opened."));
+        addRenderableWidget(GuardUi.button("?",x,layout.footerY(),22,20,()->GuardUi.choices(this,"Timing Help","TIMING\nEntry Time or Recoil Time reaches the selected pose.\nHold waits before returning to rest.\nGuarding Hold maintains the pose until guarding ends.\n\nBATCH SAVE\nSave applies both tabs to all selected presets.\nPlacement and items are kept.\nDrag timing by 10 ms; scroll by 1 ms.\nShift-scroll changes values by 10.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)))));
+        int actionWidth=Math.min(100,(inner-38)/2);
+        addRenderableWidget(GuardUi.button("Save",x+inner-2*actionWidth-6,layout.footerY(),actionWidth,20,()->accept.accept(draft.copy())));
+        addRenderableWidget(GuardUi.button("Close",x+inner-actionWidth,layout.footerY(),actionWidth,20,this::onClose));
     }
-    private void slider(String label,int field,int max,int y,String tooltip){
-        var slider=addRenderableWidget(new GuardSlider(left+8,y,w-16,20,draft.values[field],0,max,
-            GuardUi.dragStep(0,max,1), value -> label+": "+value+(field==22?"%":" ms"),
-            value -> draft.values[field]=value, () -> draft.values[field]!=original.values[field]));slider.setTooltip(GuardUi.tooltip(tooltip));
+    private void setCurve(int value){values()[21]=value;Minecraft.getInstance().setScreen(this);}
+    private void slider(String label,int field,int max,int x,int y,int w,String tooltip){
+        var slider=addRenderableWidget(new GuardSlider(x,y,w,20,values()[field],0,max,GuardUi.dragStep(0,max,1),value->label+": "+value+(field==22?"%":" ms"),value->values()[field]=value,()->values()[field]!=originalValues()[field]));slider.setTooltip(GuardUi.tooltip(tooltip));
     }
-    @Override public void render(GuiGraphics g,int x,int y,float d){g.flush();renderBackground(g,x,y,d);g.flush();GuardUi.panel(g,left,top,w,172,false);g.drawCenteredString(font,title,width/2,top+9,GuardUi.TEXT);for(var widget:renderables)widget.render(g,x,y,d);}
-    @Override public void onClose(){Minecraft.getInstance().setScreen(parent);}
+    @Override public void render(GuiGraphics g,int x,int y,float d){
+        g.flush();renderBackground(g,x,y,d);g.flush();GuardUi.panel(g,layout.left(),layout.top(),layout.width(),layout.bottom()-layout.top(),false);
+        g.drawString(font,"Preset Timing",layout.x(),layout.top()+10,GuardUi.TEXT);
+        g.drawString(font,"Both tabs are saved together",layout.x(),layout.top()+22,GuardUi.MUTED);
+        for(var widget:renderables)widget.render(g,x,y,d);
+    }
+    @Override public void onClose(){
+        if(!GuardPoseLibrary.samePose(draft,original))GuardUi.choices(this,"Unsaved timing","Save or discard these timing changes.",new GuardUi.Choice("Save",()->accept.accept(draft.copy())),new GuardUi.Choice("Discard",()->Minecraft.getInstance().setScreen(parent)),new GuardUi.Choice("Go Back",()->Minecraft.getInstance().setScreen(this)));
+        else Minecraft.getInstance().setScreen(parent);
+    }
     @Override public boolean isPauseScreen(){return parent.isPauseScreen();}
 }

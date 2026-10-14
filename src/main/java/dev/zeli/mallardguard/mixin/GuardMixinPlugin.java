@@ -10,7 +10,7 @@ public final class GuardMixinPlugin implements IMixinConfigPlugin {
     public String getRefMapperConfig() { return null; }
     public boolean shouldApplyMixin(String target, String mixin) {
         if (mixin.endsWith("EmfGuardPoseMixin")) return LoadingModList.get().getModFileById("entity_model_features") != null;
-        if (mixin.endsWith("BetterCombatFeintMixin")) return LoadingModList.get().getModFileById("bettercombat") != null;
+        if (mixin.endsWith("BetterCombatGuardMixin")) return LoadingModList.get().getModFileById("bettercombat") != null;
         if (mixin.contains("Punchy")) {
             var file = LoadingModList.get().getModFileById("punchy");
             return file != null && dev.zeli.mallardguard.GuardPunchyApi.compatible()

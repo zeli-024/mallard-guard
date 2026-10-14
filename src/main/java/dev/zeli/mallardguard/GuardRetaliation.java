@@ -17,19 +17,19 @@ public final class GuardRetaliation {
     private record Hit(UUID target, float amount) {}
     private record Pending(ResourceKey<Level> dimension, long expiresAt, List<Hit> hits) {}
     private static final Map<UUID, LinkedHashMap<Integer, Pending>> PENDING = new HashMap<>();
-    private static final Map<UUID, Integer> CURRENT = new HashMap<>(), CLIENT_FRAMES = new HashMap<>();
-    private static int nextToken, enforcedFrames = 6;
+    private static final Map<UUID, Integer> CURRENT = new HashMap<>(), CLIENT_TICKS = new HashMap<>();
+    private static int nextToken, enforcedTicks = GuardClientSettings.initial(3);
 
-    public static void clearSession(){PENDING.clear();CURRENT.clear();CLIENT_FRAMES.clear();nextToken=0;}
+    public static void clearSession(){PENDING.clear();CURRENT.clear();CLIENT_TICKS.clear();nextToken=0;}
 
     private GuardRetaliation() {}
 
-    public static void clientFrames(ServerPlayer player, int frames) {
-        CLIENT_FRAMES.put(player.getUUID(), Math.clamp(frames, 0, 10));
+    public static void clientTicks(ServerPlayer player, int ticks) {
+        CLIENT_TICKS.put(player.getUUID(), Math.clamp(ticks, 0, 30));
     }
 
-    public static void enforcedFrames(int frames) {
-        enforcedFrames = Math.clamp(frames, 0, 10);
+    public static void enforcedTicks(int ticks) {
+        enforcedTicks = Math.clamp(ticks, 0, 30);
     }
 
     public static int begin(ServerPlayer player) {
@@ -37,8 +37,8 @@ public final class GuardRetaliation {
         CURRENT.remove(id);
         boolean locked = GuardConfig.ENFORCE_CLIENT.get()
             && (GuardConfig.CLIENT_EXEMPT_MASK.get() & GuardClientPreset.SCREEN) == 0;
-        int frames = locked ? enforcedFrames : CLIENT_FRAMES.getOrDefault(id, 0);
-        if (frames == 0) return 0;
+        int ticks = locked ? enforcedTicks : CLIENT_TICKS.getOrDefault(id, 0);
+        if (ticks == 0) return 0;
         LinkedHashMap<Integer, Pending> pending = PENDING.computeIfAbsent(id, ignored -> new LinkedHashMap<>());
         // Bound retained work even when completion packets never arrive.
         if (pending.size() >= 16) complete(player, pending.keySet().iterator().next());
@@ -96,6 +96,6 @@ public final class GuardRetaliation {
 
     public static void forget(ServerPlayer player) {
         UUID id = player.getUUID();
-        cancelPending(player); CLIENT_FRAMES.remove(id);
+        cancelPending(player); CLIENT_TICKS.remove(id);
     }
 }

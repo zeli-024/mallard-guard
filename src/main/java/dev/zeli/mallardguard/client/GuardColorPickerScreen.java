@@ -17,6 +17,7 @@ final class GuardColorPickerScreen extends Screen {
     private final int original;
     private double hue,saturation,value;
     private DynamicTexture texture;
+    private double paintedHue=Double.NaN;
     private ResourceLocation location;
     private EditBox hex;
     private int left,top,drag;
@@ -27,7 +28,7 @@ final class GuardColorPickerScreen extends Screen {
     }
     @Override protected void init(){
         left=(width-224)/2;top=(height-224)/2;
-        if(texture==null){texture=new DynamicTexture(new NativeImage(128,128,false));location=Minecraft.getInstance().getTextureManager().register("mallard_guard_color_picker",texture);}
+        if(texture==null){paintedHue=Double.NaN;texture=new DynamicTexture(new NativeImage(128,128,false));location=Minecraft.getInstance().getTextureManager().register("mallard_guard_color_picker",texture);}
         updateTexture();
         hex=addRenderableWidget(GuardUi.editBox(font,left+90,top+161,102,"Hex color"));
         hex.setMaxLength(7);hex.setValue(String.format("#%06X",color()));
@@ -38,6 +39,7 @@ final class GuardColorPickerScreen extends Screen {
     }
     private int color(){return GuardColorPickerMath.rgb(hue,saturation,value);}
     private void updateTexture(){
+        if(paintedHue==hue)return;
         NativeImage image=texture.getPixels();if(image==null)return;
         // Subpixel coverage is computed only when hue changes; rendering still uses one cached quad.
         final int samples=4;
@@ -59,7 +61,7 @@ final class GuardColorPickerScreen extends Screen {
             int pixel=count==0?0:Math.round(count*255f/(samples*samples))<<24|Math.round(blue/(float)count)<<16|Math.round(green/(float)count)<<8|Math.round(red/(float)count);
             image.setPixelRGBA(x,y,pixel);
         }
-        texture.upload();
+        texture.upload();paintedHue=hue;
     }
     private boolean pick(double mx,double my,boolean starting){
         double x=mx-(left+48),y=my-(top+25),dx=x-64,dy=y-64,r=Math.sqrt(dx*dx+dy*dy);

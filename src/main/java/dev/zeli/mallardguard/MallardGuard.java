@@ -39,8 +39,8 @@ public final class MallardGuard {
         container.registerConfig(ModConfig.Type.SERVER, GuardConfig.SERVER_SPEC, "mallard_guard/server.toml");
         container.registerConfig(ModConfig.Type.CLIENT, GuardConfig.CLIENT_SPEC, "mallard_guard/client.toml");
         container.registerConfig(ModConfig.Type.CLIENT, GuardConfig.PUNCHY_SPEC, "mallard_guard/mg_punchy/config.toml");
-        modBus.addListener(GuardShieldExpansionCompat::setup);
-        NeoForge.EVENT_BUS.addListener(GuardShieldExpansionCompat::serverStarted);
+        modBus.addListener(GuardCompatibility::setup);
+        NeoForge.EVENT_BUS.addListener(GuardCompatibility::serverStarted);
         GuardSounds.EVENTS.register(modBus);
         GuardParticles.TYPES.register(modBus);
         modBus.addListener(GuardPackets::register);
@@ -131,7 +131,7 @@ public final class MallardGuard {
         GuardState.Result result = GuardState.handleHit(player, event.getSource());
         if (result == GuardState.Result.PERFECT || result == GuardState.Result.PARRY) {
             boolean shield = GuardState.shieldGuard(player);
-            PacketDistributor.sendToPlayer(player, new GuardPackets.HitResult(result == GuardState.Result.PERFECT ? 2 : 1, false, result == GuardState.Result.PERFECT ? GuardRetaliation.begin(player) : 0));
+            PacketDistributor.sendToPlayer(player, new GuardPackets.HitResult(result == GuardState.Result.PERFECT ? 2 : 1, false, result == GuardState.Result.PERFECT ? GuardRetaliation.begin(player) : 0, GuardState.inputId(player), event.getSource().getEntity()==null?-1:event.getSource().getEntity().getId()));
             GuardEffects.onHit(player, event.getSource(), result,event.getAmount());
             GuardState.wear(player, result);
             event.setCanceled(true);
@@ -139,14 +139,14 @@ public final class MallardGuard {
                 GuardCombatEffects.fall(player, event.getAmount(), result == GuardState.Result.PERFECT);
             } else {
                 Vec3 origin = event.getSource().getSourcePosition();
-                GuardCombatEffects.pushDefender(player, origin, shield);
+                GuardCombatEffects.pushDefender(player, origin, shield, result == GuardState.Result.PERFECT);
             }
             if (shield && result == GuardState.Result.PERFECT)
                 GuardCombatEffects.shieldPerfect(player, event.getAmount());
             else if (!shield && event.getSource().getEntity() instanceof LivingEntity attacker && attacker != player
                 && event.getSource().getDirectEntity() == attacker) {
                 float multiplier = result == GuardState.Result.PERFECT ? GuardConfig.PERFECT_RETALIATION.get().floatValue() : GuardConfig.PARRY_RETALIATION.get().floatValue();
-                if (multiplier > 0 && event.getAmount() > 0) {
+                if (GuardConfig.RETALIATION_ENABLED.get() && multiplier > 0 && event.getAmount() > 0) {
                     if (result == GuardState.Result.PERFECT) GuardRetaliation.damage(player, attacker, event.getAmount() * multiplier);
                     else returnDamage(player, attacker, event.getAmount() * multiplier);
                 }
@@ -154,11 +154,11 @@ public final class MallardGuard {
             if ((result == GuardState.Result.PARRY || !shield && result == GuardState.Result.PERFECT)
                 && event.getSource().getEntity() instanceof LivingEntity attacker
                 && attacker != player && event.getSource().getDirectEntity() == attacker)
-                GuardCombatEffects.pushAttacker(player, attacker, shield);
+                GuardCombatEffects.pushAttacker(player, attacker, shield, result == GuardState.Result.PERFECT);
             return;
         }
         if (result == GuardState.Result.BLOCK) {
-            PacketDistributor.sendToPlayer(player, new GuardPackets.HitResult(3, GuardState.guardBreakPending(player), 0));
+            PacketDistributor.sendToPlayer(player, new GuardPackets.HitResult(3, GuardState.guardBreakPending(player), 0, GuardState.inputId(player), event.getSource().getEntity()==null?-1:event.getSource().getEntity().getId()));
             GuardEffects.onHit(player, event.getSource(), result,event.getAmount());
             GuardState.wear(player, result);
             event.setAmount(event.getAmount() * (1.0F - GuardConfig.BLOCK_REDUCTION.get().floatValue()));
@@ -178,7 +178,7 @@ public final class MallardGuard {
         if(event.getDamageSource().is(net.minecraft.tags.DamageTypeTags.IS_EXPLOSION))
             event.setBlockedDamage((float)(intercepted*GuardShieldExpansionCompat.explosionBlockedFraction(player.getUseItem())));
         GuardState.shieldBlocked(player);
-        PacketDistributor.sendToPlayer(player, new GuardPackets.HitResult(3, GuardState.guardBreakPending(player), 0));
+        PacketDistributor.sendToPlayer(player, new GuardPackets.HitResult(3, GuardState.guardBreakPending(player), 0, GuardState.inputId(player), event.getDamageSource().getEntity()==null?-1:event.getDamageSource().getEntity().getId()));
         GuardEffects.onHit(player, event.getDamageSource(), GuardState.Result.BLOCK,intercepted);
         // The item's own shield logic handles damage reduction and durability.
     }

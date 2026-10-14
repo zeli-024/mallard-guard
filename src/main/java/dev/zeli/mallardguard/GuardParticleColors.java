@@ -10,11 +10,11 @@ public final class GuardParticleColors {
     public static final int IMPACT_SIZE=OFFSET+11,IMPACT_DURATION=OFFSET+12,IMPACT_OPACITY=OFFSET+13,IMPACT_SPIN=OFFSET+25;
     public static final int FLYING_LIFETIME=OFFSET+38,DEBRIS_LIFETIME=OFFSET+39,TRACER_LIFETIME=OFFSET+40;
     public static final int SHIELD_FORWARD_BIAS=OFFSET+50;
-    public static final int FLYING_ENABLED=OFFSET+56,DEBRIS_ENABLED=OFFSET+57,TRACER_ENABLED=OFFSET+58,IMPACT_ENABLED=OFFSET+59,LENGTH=OFFSET+60;
+    public static final int FLYING_ENABLED=OFFSET+56,DEBRIS_ENABLED=OFFSET+57,TRACER_ENABLED=OFFSET+58,IMPACT_ENABLED=OFFSET+59,PALETTE_PREVIOUS_LENGTH=OFFSET+60,LENGTH=OFFSET+63;
     public static final int CONTROLS_PREVIOUS_LENGTH=OFFSET+56;
     // Historical serialized lengths only; these do not define live settings.
     public static final int PREVIOUS_LENGTH=OFFSET+11,IMPACT_BASE_LENGTH=OFFSET+13,IMPACT_PREVIOUS_LENGTH=OFFSET+25,IMPACT_SETTINGS_LENGTH=OFFSET+28,IMPACT_COMPONENT_LENGTH=OFFSET+33,APPEARANCE_LENGTH=OFFSET+38,LIFETIME_LENGTH=OFFSET+41,LEGACY_LENGTH=OFFSET+42,SERIALIZED_LENGTH_49=OFFSET+49,SERIALIZED_LENGTH_51=OFFSET+51;
-    public static final int TRACER_START=0xFFEBD7,TRACER_MIDDLE=0xE9B692,TRACER_END=0xFFFFFF;
+    public static final int TRACER_START=0xFFFFFF,TRACER_MIDDLE=0xFFFFFF,TRACER_END=0xFFFFFF;
     private static final String[] KEYS={
         "particles.flyingSparks.baseColor","particles.flyingSparks.colorVariation","particles.flyingSparks.size","particles.flyingSparks.sizeVariance",
         "particles.dotStreaks.baseColor","particles.dotStreaks.size","particles.shootingSparks.startColor","particles.shootingSparks.middleColor",
@@ -29,11 +29,12 @@ public final class GuardParticleColors {
         "particles.flyingSparks.lifetimeTicks","particles.dotStreaks.lifetimeTicks","particles.shootingSparks.lifetimeTicks","particles.centerImpact.crossFlashTicks",
         null,null,null,null,null,null,null,null,"particles.shieldForwardBias",
         null,null,null,null,null,
-        "particles.flyingSparks.enabled","particles.dotStreaks.enabled","particles.shootingSparks.enabled","particles.centerImpact.enabled"
+        "particles.flyingSparks.enabled","particles.dotStreaks.enabled","particles.shootingSparks.enabled","particles.centerImpact.enabled",
+        "particles.shootingSparks.perfectStartColor","particles.shootingSparks.perfectMiddleColor","particles.shootingSparks.perfectEndColor"
     };
     public static final String[] LABELS=new String[KEYS.length];
     private static final int[] DEFAULTS={
-        0xFFFFFF,0,100,50,0xFFFFFF,120,TRACER_START,TRACER_MIDDLE,TRACER_END,150,2,250,8,100,0,0,0,0,0,0,0,0,0,0,0,45,0,0,0,0,0,0,0,0,0,0,0,0,20,30,12,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,1,1
+        0xFFFFFF,0,100,50,0xFFFFFF,120,TRACER_START,TRACER_MIDDLE,TRACER_END,150,2,250,8,100,0,0,0,0,0,0,0,0,0,0,0,45,0,0,0,0,0,0,0,0,0,0,0,0,20,30,12,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,1,1,0,0,0
     };
     private static final ModConfigSpec.IntValue[] VALUES=new ModConfigSpec.IntValue[DEFAULTS.length];
     public static ModConfigSpec.IntValue FLYING_COLOR;
@@ -45,7 +46,7 @@ public final class GuardParticleColors {
     }
     private GuardParticleColors() {}
     public static boolean slot(int i){return i>=OFFSET&&i<LENGTH;}
-    public static boolean retired(int i){if(!slot(i))return false;int k=i-OFFSET;return k==1||k>=14&&k<=37&&k!=25||k>=41&&k<=49||k>=51&&k<=55;}
+    public static boolean retired(int i){if(!slot(i))return false;int k=i-OFFSET;return k==1||k>=14&&k<=37&&k!=25||k>=41&&k<=49||k>=51&&k<=55||k>=60;}
     public static boolean toggleSlot(int i){return i==SHIELD_FORWARD_BIAS||i>=FLYING_ENABLED&&i<=IMPACT_ENABLED;}
     public static boolean colorSlot(int i){return i==BASE||i==DEBRIS_COLOR||i>=TRACER_START_COLOR&&i<=TRACER_END_COLOR;}
     private static boolean lifetimeSlot(int i){return i>=FLYING_LIFETIME&&i<=TRACER_LIFETIME;}

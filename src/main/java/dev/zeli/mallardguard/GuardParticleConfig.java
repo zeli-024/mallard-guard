@@ -4,7 +4,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 /** Original particle baselines and stable preset storage. */
 public final class GuardParticleConfig {
-    public static final int PRESET_REVISION = 89;
+    public static final int PRESET_REVISION = 95;
     public static final int MAX_BASE_COUNT = 100;
     public static final int MAX_BURST_HEADS = 512, MAX_ACTIVE_HEADS = 1024;
     public static final int FADE_TICKS = 8, DROP_DELAY_TICKS = 5;
@@ -34,12 +34,12 @@ public final class GuardParticleConfig {
         return GuardParticleColors.append(GuardSparkTracerConfig.append(java.util.Arrays.copyOf(values,LEGACY_COLOR_OFFSET+4),local),local);
     }
     public static void define(ModConfigSpec.Builder builder) {
-        FLYING_BASE_INTENSITY = GuardSettingRanges.integer(builder.comment("Regular-parry spark amount as a percentage of 100 sparks. Zero disables regular-parry sparks. Electric and animated appearances share this amount."), "particles.flyingSparks.baseIntensity",5,0,100);
-        FLYING_PERFECT_INTENSITY = GuardSettingRanges.integer(builder.comment("Additional percentage of Base Intensity on perfect parries. 0% adds nothing; 100% doubles the base. Base Intensity 0 disables the effect completely."), "particles.flyingSparks.perfectIntensity",50,0,100);
-        FLYING_DAMAGE_SCALING = GuardSettingRanges.integer(builder.comment("Extra percentage of the selected amount per intercepted damage point. Zero disables damage scaling. Counts are capped at 512 per burst; projectile hits use an estimate when exact damage is unavailable."), "particles.flyingSparks.damageScaling",5,0,100);
-        DEBRIS_BASE_INTENSITY = GuardSettingRanges.integer(builder.comment("Regular-parry spark debris amount as a percentage of 100 debris sparks. Zero disables regular-parry spark debris."), "particles.dotStreaks.baseIntensity",5,0,100);
-        DEBRIS_PERFECT_INTENSITY = GuardSettingRanges.integer(builder.comment("Additional percentage of Base Intensity on perfect parries. 0% adds nothing; 100% doubles the base. Base Intensity 0 disables the effect completely."), "particles.dotStreaks.perfectIntensity",50,0,100);
-        DEBRIS_DAMAGE_SCALING = GuardSettingRanges.integer(builder.comment("Extra percentage of the selected debris amount per intercepted damage point. Zero disables scaling. Flying Sparks and Spark Debris share the burst and active budgets."), "particles.dotStreaks.damageScaling",5,0,100);
+        FLYING_BASE_INTENSITY = GuardSettingRanges.integer(builder.comment("Regular-parry spark amount as a percentage of 100 sparks. Zero disables regular-parry sparks. Electric and animated appearances share this amount."), "particles.flyingSparks.baseIntensity",8,0,100);
+        FLYING_PERFECT_INTENSITY = GuardSettingRanges.integer(builder.comment("Additional percentage of Base Intensity on perfect parries. 0% adds nothing; 100% doubles the base. Base Intensity 0 disables the effect completely."), "particles.flyingSparks.perfectIntensity",32,0,100);
+        FLYING_DAMAGE_SCALING = GuardSettingRanges.integer(builder.comment("Extra percentage of the selected amount per intercepted damage point. Zero disables damage scaling. Counts are capped at 512 per burst; projectile hits use an estimate when exact damage is unavailable."), "particles.flyingSparks.damageScaling",2,0,100);
+        DEBRIS_BASE_INTENSITY = GuardSettingRanges.integer(builder.comment("Regular-parry spark debris amount as a percentage of 100 debris sparks. Zero disables regular-parry spark debris."), "particles.dotStreaks.baseIntensity",8,0,100);
+        DEBRIS_PERFECT_INTENSITY = GuardSettingRanges.integer(builder.comment("Additional percentage of Base Intensity on perfect parries. 0% adds nothing; 100% doubles the base. Base Intensity 0 disables the effect completely."), "particles.dotStreaks.perfectIntensity",32,0,100);
+        DEBRIS_DAMAGE_SCALING = GuardSettingRanges.integer(builder.comment("Extra percentage of the selected debris amount per intercepted damage point. Zero disables scaling. Flying Sparks and Spark Debris share the burst and active budgets."), "particles.dotStreaks.damageScaling",2,0,100);
     }
     public static int perfectIncrease(int base,int previous){return base<=0?0:Math.max(0,Math.min(100,(int)Math.round((previous/(double)base-1)*100)));}
     public static void migratePerfect(int[] values){values[17]=perfectIncrease(values[16],values[17]);values[20]=perfectIncrease(values[19],values[20]);int o=GuardSparkTracerConfig.OFFSET;values[o+GuardSparkTracerConfig.PERFECTINTENSITY]=perfectIncrease(values[o+GuardSparkTracerConfig.BASEINTENSITY],values[o+GuardSparkTracerConfig.PERFECTINTENSITY]);}

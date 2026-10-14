@@ -17,6 +17,10 @@ public final class GuardPoseSettings {
         {1, 39, 3, -34, -39, -10, 43, -26, 24, 45, -54, -11, -66, 0, 0, 0, 0, -8, 10, 150, 360, 2, 100}
     };
     public static int[] defaultPose(int index) { return PRESETS[index].clone(); }
+    /** Independent editable copy; no recoil offset is added automatically. */
+    public static int[] defaultParriedPose(int[] guarding) {
+        return guarding.clone();
+    }
     public static int min(int field) {
         if (field == 0 || field >= 19) return 0;
         return (field >= 4 && field <= 6 || field >= 10 && field <= 12 || field >= 16 && field <= 18) ? -360 : -2000;

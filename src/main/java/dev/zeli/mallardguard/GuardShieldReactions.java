@@ -6,7 +6,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 /** Per-reaction controls appended after the legacy pose slots. */
 public final class GuardShieldReactions {
     public static final int OFFSET=GuardPoseSettings.OFFSET+GuardPoseSettings.COUNT*GuardPoseSettings.STRIDE;
-    public static final String[] NAMES={"Parry","Perfect Parry","Block Hit","Guard Break","Recharge"};
+    public static final String[] NAMES={"Regular Parry","Perfect Parry","Blocked Hit","Guard Broken","Parry Ready"};
     public static final String[] KEYS={"parry","perfect","block","guardBreak","recharge"};
     public static final String[] CONTROLS={"Enabled","Expansion","Shake","Flash","Echo","Duration"};
     public static final int STRIDE=6, SIZE=NAMES.length*STRIDE;
@@ -28,7 +28,8 @@ public final class GuardShieldReactions {
     public static int[] append(int[] base,boolean local){int[] result=Arrays.copyOf(base,OFFSET+SIZE);for(int i=0;i<SIZE;i++)result[OFFSET+i]=local&&used(i)?SETTINGS[i].get():defaultValue(i);return result;}
     public static void apply(int[] values){for(int i=0;i<SIZE;i++)if(used(i))SETTINGS[i].set(values[OFFSET+i]);}
     public static boolean enabled(int reaction){return SETTINGS[reaction*STRIDE].get()!=0;}
-    public static float factor(int reaction,int control){int i=reaction*STRIDE+control;return used(i)?SETTINGS[i].get()/100F:1F;}
+    public static float strength(int reaction,int control){int i=reaction*STRIDE+control;return used(i)?SETTINGS[i].get()/100F:1F;}
+    public static float factor(int reaction,int control){return GuardScreenSettings.component(reaction,control)?strength(reaction,control):0F;}
     public static long millis(int reaction){return SETTINGS[reaction*STRIDE+5].get()*50L;}
     public static void readTemplate(com.electronwill.nightconfig.core.UnmodifiableConfig config,int[] values){for(int i=0;i<SIZE;i++){if(!used(i))continue;Object raw=config.get(key(i));if(raw instanceof Number n&&n.intValue()>=(i%STRIDE==5?1:0)&&n.intValue()<=max(i))values[OFFSET+i]=n.intValue();}}
     public static void writeTemplate(com.electronwill.nightconfig.core.Config config,int[] values){for(int i=0;i<SIZE;i++)if(used(i))config.set(key(i),values[OFFSET+i]);}

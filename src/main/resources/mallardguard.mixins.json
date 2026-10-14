@@ -11,10 +11,11 @@
   ],
   "client": [
     "client.ItemInHandRendererAccessor",
+    "client.MinecraftGuardInputMixin",
     "client.MinecraftShieldReleaseMixin",
     "client.LivingEntityRendererMixin",
     "client.EmfGuardPoseMixin",
-    "client.BetterCombatFeintMixin",
+    "client.BetterCombatGuardMixin",
     "client.LivingEntityAttackTickerAccessor",
     "client.PunchyGuardPoseMixin",
     "client.PunchyGuardVisibilityMixin",
