@@ -1,0 +1,58 @@
+{
+  "format_version": 1,
+  "panel": { "max_width": 340, "height": 116 },
+  "elements": [
+    {
+      "id": "title",
+      "type": "label",
+      "y": 9,
+      "text": { "literal": "Name Preset" }
+    },
+    {
+      "id": "preset_name",
+      "type": "text_field",
+      "x": 8,
+      "y": 29,
+      "right": 8,
+      "height": 20,
+      "text": { "literal": "Preset name" },
+      "binding": "mallardguard:preset/name",
+      "tooltip": {
+        "literal": "Name this preset. Leave blank for a random unused name.\nSaving commits both poses, motion and assignments."
+      }
+    },
+    {
+      "id": "randomize_name",
+      "type": "button",
+      "x": 8,
+      "y": 53,
+      "right": 8,
+      "height": 18,
+      "text": { "literal": "Randomize Name" },
+      "action": "mallardguard:preset/randomize_name"
+    },
+    {
+      "id": "footer",
+      "type": "row",
+      "x": 8,
+      "y": 87,
+      "right": 8,
+      "height": 20,
+      "gap": 6,
+      "children": [
+        {
+          "id": "save",
+          "type": "button",
+          "text": { "literal": "Save" },
+          "action": "mallardguard:preset/save_name"
+        },
+        {
+          "id": "back",
+          "type": "button",
+          "text": { "literal": "Back" },
+          "action": "mallardguard:navigation/back"
+        }
+      ]
+    }
+  ]
+}

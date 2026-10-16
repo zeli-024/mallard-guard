@@ -10,6 +10,7 @@
     "PiglinGuardMixin"
   ],
   "client": [
+    "client.GuiAttackIndicatorMixin",
     "client.ItemInHandRendererAccessor",
     "client.MinecraftGuardInputMixin",
     "client.MinecraftShieldReleaseMixin",

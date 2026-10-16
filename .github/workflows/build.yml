@@ -2,8 +2,26 @@ name: Build and publish
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.github/workflows/**'
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_target:
+        description: Where to upload this version
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - modrinth
+          - curseforge
+          - none
+permissions:
+  contents: read
+concurrency:
+  group: mallard-guard-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,36 +32,120 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - run: chmod +x gradlew && ./gradlew build
+      - name: Build
+        id: build
+        run: chmod +x gradlew && ./gradlew build
       - uses: actions/upload-artifact@v4
         with:
           name: mallard-guard
           path: build/libs/*.jar
+      - name: Prepare release metadata
+        id: release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.publish_target != 'none'
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          properties = Path('gradle.properties').read_text(encoding='utf-8')
+          matches = re.findall(r'^mod_version=(\S+)\s*$', properties, re.MULTILINE)
+          if len(matches) != 1 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]*', matches[0]):
+              raise SystemExit('Expected one valid mod_version in gradle.properties.')
+          version = matches[0]
+          jar = Path('build/libs') / f'mallardguard-{version}.jar'
+          if not jar.is_file():
+              raise SystemExit(f'Missing release JAR: {jar}')
+          notes = Path('release-notes') / f'{version}.md'
+          changelog = notes.read_text(encoding='utf-8') if notes.is_file() else subprocess.check_output(
+              ['git', 'log', '-1', '--pretty=%B'], text=True)
+          lowered = version.lower()
+          channel = 'alpha' if 'alpha' in lowered else 'beta' if 'beta' in lowered else 'release'
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          curseforge = temporary / 'mallard-guard-curseforge.json'
+          modrinth = temporary / 'mallard-guard-modrinth.json'
+          curseforge.write_text(json.dumps({
+              'changelog': changelog,
+              'changelogType': 'text',
+              'gameVersionNames': ['1.21.1', 'NeoForge', 'Java 21', 'Client', 'Server'],
+              'releaseType': channel,
+          }), encoding='utf-8')
+          modrinth.write_text(json.dumps({
+              'name': f'Mallard Guard {version}',
+              'version_number': version,
+              'changelog': changelog,
+              'dependencies': [],
+              'game_versions': ['1.21.1'],
+              'version_type': channel,
+              'loaders': ['neoforge'],
+              'featured': False,
+              'project_id': 'hKDfGDYe',
+              'file_parts': ['file'],
+              'primary_file': 'file',
+          }), encoding='utf-8')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              for key, value in {
+                  'version': version,
+                  'upload_modrinth': 'false' if version == '1.56b' else 'true',
+                  'jar': str(jar),
+                  'curseforge_metadata': str(curseforge),
+                  'modrinth_metadata': str(modrinth),
+              }.items():
+                  output.write(f'{key}={value}\n')
+          print(f'Prepared {version} ({channel}) for Minecraft 1.21.1 / NeoForge.')
+          if version == '1.56b':
+              print('Modrinth 1.56b was uploaded manually; its upload will be skipped.')
+          PY
       - name: Upload to CurseForge
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.release.outcome == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish_target == 'all' || inputs.publish_target == 'curseforge') }}
         env:
           CF_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          RELEASE_JAR: ${{ steps.release.outputs.jar }}
+          RELEASE_METADATA: ${{ steps.release.outputs.curseforge_metadata }}
         run: |
           if [ -z "$CF_API_TOKEN" ]; then
             echo 'CurseForge upload skipped: CURSEFORGE_API_TOKEN secret is not set.'
             exit 0
           fi
-          mod_version="$(sed -n 's/^mod_version=//p' gradle.properties)"
-          release_type=release
-          case "$mod_version" in
-            *beta*) release_type=beta ;;
-          esac
-          jar="build/libs/mallardguard-${mod_version}.jar"
-          test -f "$jar"
-          notes="release-notes/${mod_version}.md"
-          if [ -f "$notes" ]; then
-            changelog="$(cat "$notes")"
-          else
-            changelog="$(git log -1 --pretty=%B)"
-          fi
-          metadata="$(CHANGELOG="$changelog" RELEASE_TYPE="$release_type" python3 -c 'import json, os; print(json.dumps({"changelog": os.environ["CHANGELOG"], "changelogType": "text", "gameVersionNames": ["1.21.1", "NeoForge", "Java 21", "Client", "Server"], "releaseType": os.environ["RELEASE_TYPE"]}))')"
           curl --fail-with-body --silent --show-error \
             -H "X-Api-Token: $CF_API_TOKEN" \
-            --form-string "metadata=$metadata" \
-            -F "file=@$jar" \
+            --form "metadata=<$RELEASE_METADATA;type=application/json" \
+            --form "file=@$RELEASE_JAR" \
             'https://minecraft.curseforge.com/api/projects/1712570/upload-file'
+      # 1.56b was uploaded manually and is awaiting review; never upload it twice.
+      - name: Upload to Modrinth
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.release.outcome == 'success' && steps.release.outputs.upload_modrinth == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish_target == 'all' || inputs.publish_target == 'modrinth') }}
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          RELEASE_JAR: ${{ steps.release.outputs.jar }}
+          RELEASE_METADATA: ${{ steps.release.outputs.modrinth_metadata }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if [ -z "$MODRINTH_TOKEN" ]; then
+            echo 'Modrinth upload failed: MODRINTH_TOKEN secret is not set.'
+            exit 1
+          fi
+          response="$RUNNER_TEMP/mallard-guard-modrinth-response.json"
+          if ! curl --fail-with-body --silent --show-error \
+            -H "Authorization: $MODRINTH_TOKEN" \
+            -H 'User-Agent: zeli-024/Mallard-Guard (https://github.com/zeli-024/Mallard-Guard)' \
+            --form "data=<$RELEASE_METADATA;type=application/json" \
+            --form "file=@$RELEASE_JAR" \
+            --output "$response" \
+            'https://api.modrinth.com/v2/version'; then
+            cat "$response"
+            exit 1
+          fi
+          python3 - "$response" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          data = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          if data.get('project_id') != 'hKDfGDYe' or data.get('version_number') != os.environ['RELEASE_VERSION'] or not data.get('files'):
+              raise SystemExit('Modrinth response did not confirm the expected release.')
+          print(f"Modrinth accepted {data['version_number']}; version ID: {data['id']}")
+          PY

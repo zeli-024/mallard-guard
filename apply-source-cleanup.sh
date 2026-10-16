@@ -40,3 +40,6 @@ rm -f -- release-notes/1.54c-beta-11-draft.md
 rm -rf -- src/main/resources/assets/mallardguard/textures/particle/parry_disc
 
 rm -f src/main/resources/assets/mallardguard/textures/gui/block_vignette.png
+
+# Superseded local preview notes.
+rm -f -- release-notes/1.56b-beta-1.md

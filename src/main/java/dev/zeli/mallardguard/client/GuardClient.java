@@ -21,7 +21,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.client.AttackIndicatorStatus;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.InteractionHand;
@@ -33,8 +32,6 @@ import java.util.List;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
-import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
-import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.ComputeFovModifierEvent;
@@ -145,7 +142,6 @@ public final class GuardClient {
     private static Player combatPlayer;
     private static ItemStack guardedShieldStack = ItemStack.EMPTY;
     private static InteractionHand guardedShieldHand;
-    private static AttackIndicatorStatus savedAttackIndicator;
 
     private static int flashDuration(boolean perfect){return perfect?260:190;}
     private static boolean flashPerfect;
@@ -493,6 +489,9 @@ public final class GuardClient {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void keepGuardSpeedOutOfFov(ComputeFovModifierEvent event) {
         Minecraft mc=Minecraft.getInstance();if(mc.player==null||event.getPlayer()!=mc.player)return;
+        double effectScale=mc.options.fovEffectScale().get();
+        // NeoForge has already applied this accessibility setting to the event's current value.
+        if(effectScale<=0 || !Double.isFinite(effectScale))return;
         AttributeInstance speed=mc.player.getAttribute(Attributes.MOVEMENT_SPEED);
         double walking=mc.player.getAbilities().getWalkingSpeed();
         if(speed!=null&&walking>0&&(speed.getModifier(GuardState.GUARD_SLOWDOWN)!=null||speed.getModifier(GuardCombatEffects.STUN_SPEED)!=null)){
@@ -503,8 +502,16 @@ public final class GuardClient {
             }
             double unguarded=base*(1+sum);
             for(AttributeModifier modifier:modifiers)if(!ourSpeedModifier(modifier)&&modifier.operation()==AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL)unguarded*=1+modifier.amount();
-            double currentFactor=(speed.getValue()/walking+1)*0.5D,cleanFactor=(Math.max(0,unguarded)/walking+1)*0.5D;
-            if(currentFactor>0&&Double.isFinite(cleanFactor))event.setNewFovModifier((float)(event.getNewFovModifier()*cleanFactor/currentFactor));
+            double cleanSpeed=speed.getAttribute().value().sanitizeValue(unguarded);
+            double currentFactor=(speed.getValue()/walking+1)*0.5D,cleanFactor=(cleanSpeed/walking+1)*0.5D;
+            if(currentFactor<=0 || !Double.isFinite(cleanFactor))return;
+            // Retain vanilla's flight/item-use factors, then interpolate both baselines before
+            // removing our movement contribution. Earlier listeners keep their relative multiplier.
+            double raw=event.getFovModifier();
+            double scaledOriginal=1+effectScale*(raw-1);
+            double scaledClean=1+effectScale*(raw*cleanFactor/currentFactor-1);
+            if(scaledOriginal>0 && Double.isFinite(scaledClean))
+                event.setNewFovModifier((float)(event.getNewFovModifier()*scaledClean/scaledOriginal));
         }
 
     }
@@ -516,7 +523,6 @@ public final class GuardClient {
         if(ownsGuardedShieldUse(mc))mc.player.stopUsingItem();
         clearGuardedShieldUse();
         if(mc.player!=null)GuardState.updateMovement(mc.player,false);
-        restoreAttackIndicator();
         wasDown=wasGuardKeyDown=false;
         waitForGuardRelease=mc.player!=null&&GUARD_KEY.isDown();
         reportedAttackTick=Long.MIN_VALUE;
@@ -665,30 +671,11 @@ public final class GuardClient {
         mc.gameMode.useItem(mc.player, InteractionHand.OFF_HAND);
     }
 
-    // The attack indicator shares vanilla's crosshair/hotbar layers. Hide it only
-    // while each layer renders, then restore the player's option immediately.
-    @SubscribeEvent
-    public static void beforeLayer(RenderGuiLayerEvent.Pre event) {
-        if (savedAttackIndicator != null) restoreAttackIndicator();
+    /** Only vanilla's attack-indicator reads use this; player options stay untouched. */
+    public static boolean hideVanillaAttackIndicator() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || !mc.player.isAlive() || mc.options.hideGui || !GuardConfig.HUD.get() ||
-            (phase == 0 && recharge == 0 && !resultVisible() && !readyGlowQueued && !readyGlowVisible())) return;
-        if (event.getName().equals(VanillaGuiLayers.CROSSHAIR) || event.getName().equals(VanillaGuiLayers.HOTBAR)) {
-            savedAttackIndicator = mc.options.attackIndicator().get();
-            mc.options.attackIndicator().set(AttackIndicatorStatus.OFF);
-        }
-    }
-
-    @SubscribeEvent
-    public static void afterLayer(RenderGuiLayerEvent.Post event) {
-        if (event.getName().equals(VanillaGuiLayers.CROSSHAIR) || event.getName().equals(VanillaGuiLayers.HOTBAR)) restoreAttackIndicator();
-    }
-
-    private static void restoreAttackIndicator() {
-        if (savedAttackIndicator != null) {
-            Minecraft.getInstance().options.attackIndicator().set(savedAttackIndicator);
-            savedAttackIndicator = null;
-        }
+        return mc.player != null && mc.player.isAlive() && !mc.options.hideGui && GuardConfig.HUD.get()
+            && (phase != 0 || recharge != 0 || resultVisible() || readyGlowQueued || readyGlowVisible());
     }
 
     private static boolean resultVisible() {
@@ -757,7 +744,6 @@ public final class GuardClient {
 
     @SubscribeEvent(priority=EventPriority.LOWEST)
     public static void render(RenderGuiEvent.Post event) {
-        restoreAttackIndicator();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || !mc.player.isAlive() || mc.options.hideGui) return;
         long counterAge = System.currentTimeMillis() - mobCounterStart;
