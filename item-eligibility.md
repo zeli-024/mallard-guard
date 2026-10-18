@@ -26,4 +26,4 @@ Tool Requirement offers Tools Without Use, All Tools and Any Held Item. The firs
 
 After editing preset assignments, choose Use Only This Preset or Allow Other Presets. Exclusive assignment reserves matching items for that preset, even while it is disabled; disabling offers a choice to clear or retain ownership. Deleting a custom preset removes its ownership. Conflicting exclusive ownership prompts before replacement. Batch editing several presets explicitly uses a shared pool. Blacklists still exclude an item from its owner's matching rules.
 
-Preset IDs remain stable across renaming. Assignment matching is separated from editor layout so future per-item definitions can use the same model; this release introduces no new item datatypes or external data definitions.
+Preset IDs remain stable across renaming. Assignment matching is separate from editor layout, so future per-item definitions can use the same model.

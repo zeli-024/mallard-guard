@@ -100,7 +100,7 @@ public final class GuardConfig {
     public static final ModConfigSpec.IntValue MOB_COUNTER_TICKS, MOB_DIFFICULTY, MOB_HITS_TO_GUARD, MOB_PERFECT_TICKS;
     public static final ModConfigSpec.IntValue LOCAL_MASTER_VOLUME, LOCAL_PARRY_VOLUME, LOCAL_PERFECT_VOLUME, LOCAL_BLOCK_VOLUME;
     // This changes only when the config schema or a default changes, never with the mod version.
-    static final int CONFIG_REVISION = 103;
+    static final int CONFIG_REVISION = 105;
     private static final ModConfigSpec.IntValue SERVER_REVISION;
     private static final ModConfigSpec.IntValue CLIENT_REVISION;
     private static final ModConfigSpec.IntValue PUNCHY_REVISION;
@@ -140,8 +140,8 @@ public final class GuardConfig {
         TOOL_MAX_BLOCKS = GuardSettingRanges.integer(server.comment("Successful weapon or empty-hand blocks before guard breaks; 0 allows unlimited blocks. Guard break delays the next guard but does not disable attacking with the item."), "toolMaxBlocks", 3, 0, 5);
         server.pop();
         server.push("timing");
-        PERFECT_TICKS = GuardSettingRanges.integer(server.comment("Perfect parry duration for tools; zero disables perfect parries. Default: 6 ticks."), "perfectTicks", 6, 0, 10);
-        PARRY_TICKS = GuardSettingRanges.integer(server.comment("Total weapon parry duration, including perfect ticks. Default: 9 ticks (6 perfect, then 3 regular)."), "parryTicks", 9, 1, 10);
+        PERFECT_TICKS = GuardSettingRanges.integer(server.comment("Perfect parry duration for tools; zero disables perfect parries. Default: 2 ticks."), "perfectTicks", 2, 0, 10);
+        PARRY_TICKS = GuardSettingRanges.integer(server.comment("Total weapon parry duration, including perfect ticks. Default: 6 ticks (2 perfect, then 4 regular)."), "parryTicks", 6, 1, 10);
         RECHARGE_TICKS = GuardSettingRanges.integer(server.comment("Time before another attempt; continues during held guard."), "rechargeTicks", 10, 1, 60);
         server.pop();
         server.push("defense");
@@ -210,8 +210,8 @@ public final class GuardConfig {
         server.pop();
         server.push("shields");
         SHIELD_CONE_ENABLED=server.comment("Enable shield perfect-parry area effects without changing their stored angle.").define("perfectConeEnabled",true);
-        SHIELD_PERFECT_TICKS = GuardSettingRanges.integer(server.comment("Shield perfect parry window, in ticks. 0 disables shield perfect parries; cannot exceed total shield parry ticks. Default: 6 ticks."), "perfectTicks", 6, 0, 10);
-        SHIELD_PARRY_TICKS = GuardSettingRanges.integer(server.comment("Total shield parry window, including perfect ticks. Default: 9 ticks (6 perfect, then 3 regular). Blocking follows without restarting shield use."), "parryTicks", 9, 1, 10);
+        SHIELD_PERFECT_TICKS = GuardSettingRanges.integer(server.comment("Shield perfect parry window, in ticks. 0 disables shield perfect parries; cannot exceed total shield parry ticks. Default: 2 ticks. Shield Expansion shields use their own total window and always keep a regular part."), "perfectTicks", 2, 0, 10);
+        SHIELD_PARRY_TICKS = GuardSettingRanges.integer(server.comment("Total shield parry window, including perfect ticks. Default: 6 ticks (2 perfect, then 4 regular). Blocking follows without restarting shield use."), "parryTicks", 6, 1, 10);
         SHIELD_RECHARGE_TICKS = GuardSettingRanges.integer(server.comment("Shield parry recharge after leaving guard; separate from guard break recharge. Regular shield parries halve it and perfect shield parries reset it, like tool parries."), "rechargeTicks", 10, 1, 60);
         ITEM_BLOCK_COUNTS = server.comment("Exact item block limits: mod:item=count, separated by commas. Overrides Shield Expansion counts and ordinary shield/weapon limits. 0 allows unlimited blocks; valid counts are 0–100.").define("itemBlockCounts", "", value -> value instanceof String text && GuardItemBlockCounts.valid(text));
         SHIELD_MAX_BLOCKS = GuardSettingRanges.integer(server.comment("Successful shield blocks before guard breaks; 0 allows unlimited blocks. Disabled shields still obey vanilla cooldown."), "maxBlocks", 5, 0, 10);

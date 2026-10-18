@@ -3,7 +3,7 @@
 1. Open `/mgc` → Debug → Diagnostics. Enable Diagnostic Logging, expand it, then enable Particle Collision Profiling. Apply the change. Other diagnostic categories can be disabled to keep the log readable.
 2. Keep particle settings and the rate of parries consistent. Test in open air well away from blocks, above a flat floor, and beside a wall/floor corner. Use the same type of parry in each location.
 3. Let the test warm up for a few reports, then collect two or three reports per location. Each complete report covers 100 advancing game ticks, normally about five seconds. Paused ticks do not advance the reporting window.
-4. Send `logs/latest.log` from the Minecraft instance and identify which reports belong to each location. Report lines begin with `Particle collisions:`. Disable profiling after testing.
+4. Attach `logs/latest.log` to your report and note which reports belong to each location. Report lines begin with `Particle collisions:`. Disable profiling after testing.
 
 Flying Sparks, Spark Debris and Spark Tracers are reported separately. To compare their individual collision costs, keep their settings fixed; optionally test one effect at a time by setting the other effects' base amounts to zero temporarily.
 

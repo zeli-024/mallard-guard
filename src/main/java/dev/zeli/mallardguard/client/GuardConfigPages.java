@@ -54,10 +54,10 @@ final class GuardConfigPages {
                 screen.sliderBound(Control.SHIELD_PARRY_PUSHBACK_PERCENT,"Attacker Knockback",()->screen.configDraft.shieldRegularPush,"%",1,true,v->{screen.configDraft.shieldRegularPush=v;screen.dirtyShield=true;},"Attacker push on regular shield parries. Perfect shield parries use the separate area pushback.");
                 screen.sliderBound(Control.SHIELD_PERFECT_TICKS, "Shield perfect window", () -> screen.configDraft.shieldPerfect, " ticks", 1, true, v -> {
                     screen.configDraft.shieldPerfect = Math.min(v, screen.configDraft.shieldWindow); screen.dirtyShield = true;
-                }, "Perfect parry timing for shields. It must fit within the total shield parry window. 0 disables shield perfect parries. Default: 6 ticks.");
+                }, "Perfect parry timing for shields. It must fit within the total shield parry window. 0 disables shield perfect parries. Default: 2 ticks. Shield Expansion shields use their own total window and always keep a regular part.");
                 screen.sliderBound(Control.SHIELD_PARRY_TICKS, "Shield parry window", () -> screen.configDraft.shieldWindow, " ticks", 1, true, v -> {
                     screen.configDraft.shieldWindow = v; screen.configDraft.shieldPerfect = Math.min(screen.configDraft.shieldPerfect, v); screen.dirtyShield = true;
-                }, "Total shield parry time, including its perfect window. Default: 9 ticks (6 perfect, then 3 regular). Lowering this also limits perfect timing. Shield use continues into blocking until release or guard break.");
+                }, "Total shield parry time, including its perfect window. Default: 6 ticks (2 perfect, then 4 regular). Lowering this also limits perfect timing. Shield use continues into blocking until release or guard break.");
                 screen.sliderBound(Control.SHIELD_RECHARGE_TICKS, "Shield parry recharge", () -> screen.configDraft.shieldRechargeTicks, " ticks", 1, true, v -> { screen.configDraft.shieldRechargeTicks = v; screen.dirtyShield = true; }, "Time before another shield parry after releasing guard. Regular shield parries halve it; perfect shield parries reset it. Separate from the guard break penalty.");
                 screen.sliderBound(Control.SHIELD_MAX_BLOCKS, "Shield blocks before break", () -> screen.configDraft.shieldMaxBlocks, "", 1, true, v -> { screen.configDraft.shieldMaxBlocks = v; screen.dirtyShield = true; }, "Successful shield blocks allowed before the guard ends. 0 allows unlimited blocks. A disabled shield still follows vanilla's cooldown.");
                 }
@@ -195,7 +195,7 @@ final class GuardConfigPages {
         if(screen.sparkTracersOpen) {
             for(int k:GuardSparkTracerConfig.DISPLAY_ORDER) {
                 final int index=tracerOffset+k;
-                screen.slider(GuardSparkTracerConfig.LABELS[k],()->target[index],0,100,"%",1,server,v->target[index]=v,GuardSparkTracerConfig.TIPS[k]);
+                screen.slider(GuardSparkTracerConfig.LABELS[k],()->target[index],GuardSparkTracerConfig.MIN[k],GuardSparkTracerConfig.MAX[k],"%",1,server,v->target[index]=v,GuardSparkTracerConfig.TIPS[k]);
             }
             screen.particleAppearance(server,GuardParticleColors.TRACER_START_COLOR,GuardParticleColors.PREVIOUS_LENGTH);
         }
@@ -207,8 +207,8 @@ final class GuardConfigPages {
         var d=screen.configDraft;
         screen.featureDivider("Parrying",()->screen.timingOpen,()->d.parry,v->d.parry=v,true,"Timed parries and their windows.");
         if(screen.timingOpen&&d.parry){
-            screen.sliderBound(Control.PERFECT_TICKS,"Perfect Window",()->d.perfect," ticks",1,true,v->d.perfect=Math.min(v,d.window),"Perfect timing at the start of the total parry window. 0 disables perfect parries. Default: 6 ticks.");
-            screen.sliderBound(Control.PARRY_TICKS,"Parry Window",()->d.window," ticks",1,true,v->{d.window=v;d.perfect=Math.min(d.perfect,v);},"Total time to catch a hit, including perfect timing. Default: 9 ticks (6 perfect, then 3 regular).");
+            screen.sliderBound(Control.PERFECT_TICKS,"Perfect Window",()->d.perfect," ticks",1,true,v->d.perfect=Math.min(v,d.window),"Perfect timing at the start of the total parry window. 0 disables perfect parries. Default: 2 ticks.");
+            screen.sliderBound(Control.PARRY_TICKS,"Parry Window",()->d.window," ticks",1,true,v->{d.window=v;d.perfect=Math.min(d.perfect,v);},"Total time to catch a hit, including perfect timing. Default: 6 ticks (2 perfect, then 4 regular).");
             screen.sliderBound(Control.RECHARGE_TICKS,"Recharge",()->d.recharge," ticks",1,true,v->d.recharge=v,"Wait before another parry attempt.");
             screen.sliderBound(Control.FACING_ANGLE,"Facing Angle",()->d.angle,"°",1,true,v->d.angle=v,"180° covers the front half; 360° covers all directions.");
             screen.sliderBound(Control.FOLLOW_UP_TICKS,"Follow-up Parries",()->d.followUp," ticks",1,true,v->d.followUp=v,"Catch additional valid hits after success. These hits do not extend the timer. Default: 5 ticks.");

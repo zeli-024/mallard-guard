@@ -19,7 +19,7 @@ There are 22 mod-owned texture PNGs and 50 OGG files. The four particle definiti
 
 ## Center Impact
 
-Each impact sits at the particle burst origin, faces the camera, and has no movement or collision. Its white artwork contains the approved two-cross opening and outward dissipation. All six frames are 64×64 and use one shared center. The runtime chooses one random starting angle and one spin direction, advances through the six frames across Duration, and applies a final fade. It does not scale the artwork over time.
+Each impact sits at the particle burst origin, faces the camera, and has no movement or collision. Its white artwork contains a two-cross opening and outward dissipation. All six frames are 64×64 and use one shared center. The runtime chooses one random starting angle and one spin direction, advances through the six frames across Duration, and applies a final fade. It does not scale the artwork over time.
 
 Each frame has a corresponding mask. The white artwork is drawn first; a colored copy of the mask is drawn above it unless the current color is white. Mask alpha selects how much color covers each area. Keep the mask within the artwork silhouette and preserve its transparent holes. The color moves through the tracer Start, Middle and End palette across normalized lifetime. Mob impacts use the palette sent with the mob's burst. Overall Opacity scales both draws.
 

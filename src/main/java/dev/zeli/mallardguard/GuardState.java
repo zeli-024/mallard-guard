@@ -219,7 +219,7 @@ public final class GuardState {
         boolean shield = GuardItemRules.shieldLike(state.heldItem);
         state.blocksTaken = 0;
         state.breakPending = false;
-        state.phase = GuardConfig.PARRY.get() ? ((shield ? GuardConfig.SHIELD_PERFECT_TICKS : GuardConfig.PERFECT_TICKS).get() > 0 ? 1 : 2)
+        state.phase = GuardConfig.PARRY.get() ? (perfectTicks(state.heldItem, shield) > 0 ? 1 : 2)
             : shield ? 4 : 3;
         if (shield && (!player.isUsingItem() || player.getUsedItemHand() != hand)) player.startUsingItem(hand);
         state.recharge = (shield ? GuardShieldExpansionCompat.cooldownTicks(state.heldItem,GuardConfig.SHIELD_RECHARGE_TICKS.get()) : GuardConfig.RECHARGE_TICKS.get());
@@ -267,7 +267,7 @@ public final class GuardState {
                         if (shield && player.isUsingItem() && player.getUsedItemHand() == state.guardHand)
                             player.stopUsingItem();
                     }
-                } else if (state.elapsed >= (shield ? GuardConfig.SHIELD_PERFECT_TICKS : GuardConfig.PERFECT_TICKS).get()) {
+                } else if (state.elapsed >= perfectTicks(state.heldItem, shield)) {
                     state.phase = 2;
                 }
             }
@@ -280,6 +280,11 @@ public final class GuardState {
         sync(player, state);
         if (!state.held && state.phase == 0 && state.recharge == 0
             && player.level().getGameTime() > state.safetyThroughTick) state.heldItem = ItemStack.EMPTY;
+    }
+
+    private static int perfectTicks(ItemStack held, boolean shield) {
+        return shield ? GuardShieldExpansionCompat.perfectTicks(held, GuardConfig.SHIELD_PERFECT_TICKS.get(), GuardConfig.SHIELD_PARRY_TICKS.get())
+            : GuardConfig.PERFECT_TICKS.get();
     }
 
     private static void applyGuardBreak(ServerPlayer player, GuardState state) {

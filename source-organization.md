@@ -34,7 +34,7 @@ Saved custom values remain intact. Reset uses current defaults. Server edits rem
 
 ## Better Combat swing ownership
 
-`GuardBetterCombatCompat` reads Better Combat's actual swing and feint state. Existing attack readiness checks gate guard entry. Vanilla and Better Combat attack starts share `GuardClient.attacksBlocked`: active guarding or authoritative incoming stun prevents a new attack. Releasing guard permits attacks when no stun remains. Incoming parries use the adapter's optional cancellation hook; this does not reintroduce the retired guard-to-attack handoff attempts.
+`GuardBetterCombatCompat` reads Better Combat's actual swing and feint state. Existing attack readiness checks gate guard entry. Vanilla and Better Combat attack starts share `GuardClient.attacksBlocked`: active guarding or authoritative incoming stun prevents a new attack. Releasing guard permits attacks when no stun remains. Incoming parries use the adapter's optional cancellation hook. Guarding never hands off directly into an attack.
 
 ## Pose editing and preset deletion
 
@@ -44,7 +44,7 @@ The pose editor stores only its editable draft and UI navigation. GuardUiLayout 
 
 The living-render mixin copies only the selected opponent's submitted vertices into per-material batches. It does not allocate, clear or bind GPU targets. GuardParryHighlight performs mask work afterward inside GuardRenderTargets.State, preserving the original renderer state and material alpha. Targets are reused between nearby parries and retired after idle/session cleanup.
 
-GuardHitlag advances the highlight state once per rendered feedback frame. Before-mode Highlight starts with feedback and uses its own configured duration, with or without a freeze. White Flash starts at the end of hitlag; After-mode Highlight waits for that flash, including Meme Flash when enabled, then delays two ticks. Camera Shake and Chromatic Aberration run independently. Impact Frame can filter a live scene with hitlag disabled. No registry scan or full entity rerender is added.
+GuardHitlag advances the highlight state once per rendered feedback frame. Before-mode Highlight starts with feedback and uses its own configured duration, with or without a freeze. White Flash starts at the end of hitlag; After-mode Highlight waits for that flash, including Meme Flash when enabled, then delays two ticks. Camera Shake and Chromatic Aberration run independently. Impact Frame can filter a live scene with hitlag disabled. Highlighting uses neither a registry scan nor a full entity rerender.
 
 Diagnostics is listed under Server. Its local channels are grouped into Combat, Animations, Effects & Performance, and Config & Assignments. The shared channel definitions drive menu/search entries; event caches remain bounded. Server gameplay permissions are not granted by diagnostic access.
 

@@ -1,31 +1,40 @@
-# Particle effects — current behavior
+# Particle effects
 
-Flying Sparks, Spark Debris and Spark Tracers share a parry origin, an uneven upward-favored spherical launch distribution and one bounded head budget. Shield Forward Bias optionally favors defender yaw while retaining side/rear directions. Fall parries use a horizontal ring with slight vertical variation instead. Each family retains its own motion, drag, gravity, collisions and rendering.
+Flying Sparks, Spark Debris and Spark Tracers share a parry origin, an upward-favored spherical launch distribution and one bounded head budget (512 heads per burst, 1024 active). Shield Forward Bias, inside Spark Tracers and On by default, favors the defender's facing while keeping side and rear directions; it affects all three families. Fall parries use a horizontal ring with slight vertical variation instead. Each family has its own motion, drag, gravity, collisions and rendering.
 
-Base lifetimes default to 20 ticks for Flying Sparks, 30 ticks for Spark Debris, and 12 ticks for Spark Tracers. Flying Sparks normally live for 50–100% of that value; 12% sample a longer 110–135% lifetime. This lifetime behavior is unchanged. Flying Size Variance now defaults to 50% while retaining the selected 0.55–1.60 spawn-size range. Base intensity defaults to 5%, perfect adds 50% of that base, damage adds 5% per damage point. Base intensity 0 disables the family. Tracer tails keep their independent 1–4-tick length setting and tick-stepped squares.
+## Amount
 
-Center Impact is a stationary, camera-facing six-frame animation: six 64×64 white artwork PNGs and six matching tint-mask PNGs. Defaults: Size 250%, Spin Speed 45 degrees/second, Opacity 100%, Duration 8 ticks. Starting rotation and spin direction are sampled once per spawn. Drawn expansion and outward dissipation live in the PNG sequence; runtime rotates it and fades its final frame interval without resizing it over time. Mask alpha controls color coverage with no separate tint-strength slider.
+Each family has Base Intensity, Perfect Intensity and Damage Scaling.
 
-All effect geometry shares the existing particle-atlas batch. Active lists are bounded and clear on world/session changes. Death clears player-specific HUD and feedback without deleting other players' world effects. One shared monitor protects custom rendering, particle ticks/history, registry publication/pruning, palette application, removal and collision-profiler windows. It supports overlapping tick/render scheduling without copying lists or trails every frame. Only Mallard Guard particle work is serialized; other mods' particle settings are not changed. Runtime compatibility still needs an AsyncParticles test.
+- **Base Intensity** is a percentage of 100 heads. 0% disables that family for regular and perfect parries.
+- **Perfect Intensity** adds a percentage of the base amount on perfect parries, up to 200%. 100% doubles the base.
+- **Damage Scaling** adds a percentage of the selected amount per intercepted damage point. Projectile hits use an estimate when exact damage is unavailable.
 
-Mob tracers and their Center Impact use the server-selected mob Start/Middle/End palette captured with the burst. Player palettes are shared and cached by the server. The palette is captured before the first tick; separate bursts never share mutable color state. Mob Flying Sparks and Spark Debris each use their own server-selected color from that burst.
+Defaults for all three families: 6% Base, 125% Perfect and 2% Damage Scaling.
 
-All player and mob spark colors default to #FFFFFF. Mob Flying Sparks and Spark Debris are independent of the tracer Start/Middle/End palette; the Center Impact inherits those three tracer colors. Chromatic Aberration defaults to 6 ticks.
+## Appearance
 
-## Multiplayer palettes and effect toggles
+| | Flying Sparks | Spark Debris | Spark Tracers |
+| --- | --- | --- | --- |
+| Size | 80% | 100% | 125% |
+| Lifetime | 20 ticks | 30 ticks | 12 ticks |
 
-Player colors (Flying Sparks, Spark Debris and one shared three-color Spark Tracer palette) are shared on joining and applying a changed palette. The server stores one palette per connected player; bursts reference its small numeric ID. A late join receives the current palettes. Respawns and dimension changes retain the palette; logout and server shutdown remove it. Each received burst captures immutable colors before any hitlag delay, and each spawned particle retains that selection. Only colors are shared; the viewer keeps their local intensity, size, lifetime and enable/disable preferences unless the server enforces that category.
+Flying Sparks normally live for 50–100% of their lifetime; 12% linger for 110–135%. Flying Size Variance defaults to 50%, giving a 0.55–1.60 spawn-size range. Spark Tracer tails last 1–4 ticks (default 2) and are drawn as tick-stepped squares.
 
-Server enforcement overrides shared player palettes; disabling enforcement restores their submitted colors. All mob spark colors and matching impact colors always come from server settings. Server config reloads redistribute the policy and cached palettes.
+Each family and the Center Impact has its own On/Off switch in its section header. Turning one off stops spawning without changing its saved sliders.
 
-Each spark family and the Center Impact has its own On/Off switch in its existing divider. Off stops spawning that family without changing its saved sliders. The shield forward-bias option now sits inside Spark Tracers and defaults On; it still affects all three spark families. Fall parries retain their horizontal ring spread.
+## Center Impact
 
-Hitlag durations use Minecraft ticks. Perfect defaults to 3 ticks, regular to 1. The shared Hitlag switch and Perfect Only option apply to both parrying and getting parried. Historical 1/60-second durations migrate to ticks once; reset uses the current defaults.
+A stationary, camera-facing six-frame animation made of six 64×64 white artwork frames and six matching tint masks. Defaults: Size 250%, Spin Speed 45°/second, Opacity 100%, Duration 8 ticks. The starting rotation and spin direction are chosen once per appearance. Expansion and dissipation are drawn into the frames; the runtime rotates the animation and fades its final frame without resizing it. Mask alpha controls color coverage. See `resource-pack-customization.md` to replace the artwork.
 
-Regular and perfect parries share the same Start/Middle/End tracer palette and matching Center Impact colors. The old perfect-only palette positions remain reserved in serialized presets; their config keys are retired. Mob colors remain server-owned.
+## Colors
 
-Impact Frame runs during the latter half of hitlag when a freeze plays. Without hitlag it filters the live world using the existing Hitlag Duration (regular zero falls back to that duration); no freeze is added. It defaults Off / Perfect Only On. Target Highlight defaults to Before, Perfect Only, 6 ticks, 60% world dim, 2-tick fades and 80% glow; attacker white, target red. Before starts with feedback and always uses its own lifetime, independently of hitlag. White Flash defaults Off, starts at hitlag end (immediately without hitlag), and keeps its 260/190 ms fades. After-mode Highlight starts two ticks after eligible White/Meme Flash ends, or two ticks after hitlag when no flash plays. Camera Shake and Chromatic Aberration do not delay this sequence. Their regular controls follow the unsaved Perfect Only draft immediately.
+All player and mob spark colors default to white (#FFFFFF). Spark Tracers use a Start/Middle/End palette across their lifetime, and the Center Impact uses the same palette. Regular and perfect parries share it.
 
-All spark families default to 8% Base, 32% Perfect and 2% Damage Intensity. Player colors default white; the server-owned mob colors also default white, with independent Flying Sparks and Spark Debris colors and a shared tracer/Center Impact palette.
+Player colors (Flying Sparks, Spark Debris and the tracer palette) are shared with other players when joining and when a changed palette is applied. The server stores one palette per connected player, and each burst references it by a small numeric ID. Late joiners receive the current palettes. Palettes survive respawns and dimension changes and are removed on logout and server shutdown. Each burst captures its colors before any hitlag delay, so separate bursts never share mutable color state. Only colors are shared: each viewer keeps their own intensity, size, lifetime and On/Off preferences unless the server enforces that category.
 
-Hitlag defaults to 3 ticks for perfect and 1 tick for regular parries. For the fullest Impact Frame presentation, set perfect hitlag to 6 ticks. This is a recommendation, not an automatic change when enabling Impact Frame.
+Server enforcement overrides shared player palettes; disabling enforcement restores the players' own colors. Mob spark colors and their Center Impact always come from server settings, with separate Flying Sparks and Spark Debris colors and a tracer palette captured with each mob burst. Server config reloads redistribute the policy and cached palettes.
+
+## Rendering and lifecycle
+
+All effect geometry is drawn in the shared particle-atlas batch. Active lists are bounded and cleared on world and session changes. Death clears player-specific HUD feedback without removing other players' world effects. One shared monitor guards Mallard Guard's particle ticks, histories, rendering, palette publication and collision profiling, so its particles remain safe when another mod ticks particles asynchronously. Other mods' particle settings are not changed.

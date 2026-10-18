@@ -41,7 +41,7 @@ public final class GuardParryParticleMath {
     public static int particleCount(int intensity,int perfectIncrease,boolean perfect,double damage,int damageScaling){
         if(!Double.isFinite(damage)||damage<0||intensity<=0)return 0;
         double base=dev.zeli.mallardguard.GuardParticleConfig.MAX_BASE_COUNT*Math.clamp(intensity,0,100)/100.0;
-        double extra=perfect?1+Math.clamp(perfectIncrease,0,100)/100.0:1;
+        double extra=perfect?1+Math.clamp(perfectIncrease,0,dev.zeli.mallardguard.GuardParticleConfig.MAX_PERFECT_INTENSITY)/100.0:1;
         return (int)Math.min(dev.zeli.mallardguard.GuardParticleConfig.MAX_BURST_HEADS,Math.round(base*extra*(1+damage*Math.clamp(damageScaling,0,100)/100.0)));
     }
     public static double directionAcceptance(double dot,double bias) {

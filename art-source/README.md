@@ -1,7 +1,7 @@
 # Sharp 64px parry impact
 
 center-impact.png is the editable 384 x 64 RGBA strip: six 64 x 64 frames.
-The first two drawings combine the approved upright cross and its larger translucent angled layer.
+The first two drawings combine an upright cross and its larger translucent angled layer.
 The following four drawings clear the center and disperse into thin, unevenly fading arcs.
 There is no third cross or glow. Motion is drawn in the pixels; runtime does not resize the animation over time.
 

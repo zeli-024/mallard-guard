@@ -34,7 +34,7 @@ public final class GuardParticleColors {
     };
     public static final String[] LABELS=new String[KEYS.length];
     private static final int[] DEFAULTS={
-        0xFFFFFF,0,100,50,0xFFFFFF,120,TRACER_START,TRACER_MIDDLE,TRACER_END,150,2,250,8,100,0,0,0,0,0,0,0,0,0,0,0,45,0,0,0,0,0,0,0,0,0,0,0,0,20,30,12,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,1,1,0,0,0
+        0xFFFFFF,0,80,50,0xFFFFFF,100,TRACER_START,TRACER_MIDDLE,TRACER_END,125,2,250,8,100,0,0,0,0,0,0,0,0,0,0,0,45,0,0,0,0,0,0,0,0,0,0,0,0,20,30,12,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,1,1,0,0,0
     };
     private static final ModConfigSpec.IntValue[] VALUES=new ModConfigSpec.IntValue[DEFAULTS.length];
     public static ModConfigSpec.IntValue FLYING_COLOR;

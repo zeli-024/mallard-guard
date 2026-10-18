@@ -50,13 +50,14 @@ public final class GuardSparkTracerConfig {
         TIPS[BASEINTENSITY]="Base amount. 100% produces 100 tracer heads; 0% disables Spark Tracers completely.";
         TIPS[PERFECTINTENSITY]="Extra amount on perfect parries. 0% keeps the base; 100% doubles it. Base 0% disables the effect.";
         TIPS[DAMAGESCALING]="Increase amount per damage point: 10% × 5 damage adds 50%. 0% adds nothing. All particles share burst and active head caps.";
-        DEFAULTS[BASEINTENSITY]=8;DEFAULTS[PERFECTINTENSITY]=32;DEFAULTS[DAMAGESCALING]=2;
+        DEFAULTS[BASEINTENSITY]=GuardParticleConfig.DEFAULT_BASE_INTENSITY;DEFAULTS[PERFECTINTENSITY]=GuardParticleConfig.DEFAULT_PERFECT_INTENSITY;DEFAULTS[DAMAGESCALING]=2;
         for(int i:DISPLAY_ORDER)MAX[i]=100;
+        MAX[PERFECTINTENSITY]=GuardParticleConfig.MAX_PERFECT_INTENSITY;
     }
     private GuardSparkTracerConfig() {}
     public static boolean retired(int index) {return slot(index)&&index!=OFFSET+BASEINTENSITY&&index!=OFFSET+PERFECTINTENSITY&&index!=OFFSET+DAMAGESCALING;}
     public static void define(ModConfigSpec.Builder builder) {
-        for(int i:DISPLAY_ORDER)VALUES[i]=GuardSettingRanges.integer(builder.comment(TIPS[i]), key(OFFSET+i),DEFAULTS[i],0,100);
+        for(int i:DISPLAY_ORDER)VALUES[i]=GuardSettingRanges.integer(builder.comment(TIPS[i]), key(OFFSET+i),DEFAULTS[i],MIN[i],MAX[i]);
     }
     public static int get(int local) {return local==BASEINTENSITY||local==PERFECTINTENSITY||local==DAMAGESCALING?VALUES[local].get():BASELINES[local];}
     public static boolean slot(int index) {return index>=OFFSET&&index<OFFSET+DEFAULTS.length;}

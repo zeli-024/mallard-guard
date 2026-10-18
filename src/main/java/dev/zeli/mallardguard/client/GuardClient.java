@@ -570,7 +570,7 @@ public final class GuardClient {
                 && (latestEligibility.parry() || latestEligibility.block())){
                 boolean shield=shieldLike(mc.player.getItemInHand(hand));
                 prediction.start(mc.player.level().getGameTime(),chosenOffhand,shield,latestEligibility.parry(),latestEligibility.block(),
-                    shield?latestShieldSettings.perfect():latestEligibility.perfect(),
+                    shield?GuardShieldExpansionCompat.perfectTicks(mc.player.getItemInHand(hand),latestShieldSettings.perfect(),latestShieldSettings.window()):latestEligibility.perfect(),
                     shield?GuardShieldExpansionCompat.parryTicks(mc.player.getItemInHand(hand),latestShieldSettings.window()):latestEligibility.window(),
                     shield?GuardShieldExpansionCompat.cooldownTicks(mc.player.getItemInHand(hand),latestShieldSettings.rechargeTicks()):latestEligibility.recharge());
                 applyGuardView(prediction.view(mc.player.level().getGameTime()));

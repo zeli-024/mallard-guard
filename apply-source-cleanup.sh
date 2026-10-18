@@ -43,3 +43,7 @@ rm -f src/main/resources/assets/mallardguard/textures/gui/block_vignette.png
 
 # Superseded local preview notes.
 rm -f -- release-notes/1.56b-beta-1.md
+
+# Working notes and review reports are not distributed; each released version keeps one changelog.
+rm -f -- health-diagnostic.md
+rm -f -- release-notes/*beta*.md

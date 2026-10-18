@@ -9,6 +9,19 @@ final class GuardConfigMigration {
     private GuardConfigMigration() {}
     private record DefaultChange(int revision, String path, String previous, String current) {}
     private static final List<DefaultChange> DEFAULT_CHANGES = List.of(
+        new DefaultChange(105,"timing.perfectTicks","6","2"),
+        new DefaultChange(105,"timing.parryTicks","9","6"),
+        new DefaultChange(105,"shields.perfectTicks","6","2"),
+        new DefaultChange(105,"shields.parryTicks","9","6"),
+        new DefaultChange(104,"particles.flyingSparks.size","100","80"),
+        new DefaultChange(104,"particles.flyingSparks.baseIntensity","8","6"),
+        new DefaultChange(104,"particles.flyingSparks.perfectIntensity","32","125"),
+        new DefaultChange(104,"particles.dotStreaks.size","120","100"),
+        new DefaultChange(104,"particles.dotStreaks.baseIntensity","8","6"),
+        new DefaultChange(104,"particles.dotStreaks.perfectIntensity","32","125"),
+        new DefaultChange(104,"particles.shootingSparks.overallSize","150","125"),
+        new DefaultChange(104,"particles.shootingSparks.baseIntensity","8","6"),
+        new DefaultChange(104,"particles.shootingSparks.perfectIntensity","32","125"),
         new DefaultChange(103,"timing.perfectTicks","2","6"),
         new DefaultChange(103,"timing.parryTicks","4","9"),
         new DefaultChange(103,"shields.perfectTicks","2","6"),
@@ -232,7 +245,7 @@ final class GuardConfigMigration {
         new DefaultChange(33, "pose3", "250 ms transitions", "200 ms transitions"),
         new DefaultChange(33, "pose4", "250 ms transitions", "300 ms transitions"),
         new DefaultChange(33, "pose5", "enabled; 250 ms transitions", "disabled; 200/180 ms transitions"),
-        new DefaultChange(34, "pose1–pose5", "previous preset defaults", "uploaded presets; 180/240 ms transitions; Preset 5 enabled and empty-hand only"),
+        new DefaultChange(34, "pose1–pose5", "previous preset defaults", "new preset poses; 180/240 ms transitions; Preset 5 enabled and empty-hand only"),
         new DefaultChange(36, "shields.shieldParryPriority", "1 (Shield)", "2 (Default: player main hand)"),
         new DefaultChange(37, "pose1", "180/240 ms transitions", "300 ms entry; 360 ms release"),
         new DefaultChange(37, "pose2", "180/240 ms transitions", "300 ms entry; 360 ms release"),
@@ -246,11 +259,19 @@ final class GuardConfigMigration {
 
     static List<String> defaultChanges(int oldRevision, Set<String> currentPaths) {
         var changes = new ArrayList<String>();
-        for (DefaultChange change : DEFAULT_CHANGES) {
-            if (change.revision() > oldRevision && change.revision() <= GuardConfig.CONFIG_REVISION
+        // A setting changed by several skipped revisions is reported once, from its oldest previous
+        // default to its newest; changes that return to the original default are omitted.
+        var net = new java.util.LinkedHashMap<String, String[]>();
+        DEFAULT_CHANGES.stream()
+            .filter(change -> change.revision() > oldRevision && change.revision() <= GuardConfig.CONFIG_REVISION
                 && currentPaths.contains(change.path()))
-                changes.add("Default changed: " + label(change.path()) + " (" + change.previous() + " -> " + change.current() + ")");
-        }
+            .sorted(java.util.Comparator.comparingInt(DefaultChange::revision))
+            .forEach(change -> net.merge(change.path(), new String[] {change.previous(), change.current()},
+                (oldest, newest) -> new String[] {oldest[0], newest[1]}));
+        net.forEach((path, values) -> {
+            if (!values[0].equals(values[1]))
+                changes.add("Default changed: " + label(path) + " (" + values[0] + " -> " + values[1] + ")");
+        });
         if (oldRevision < 103 && currentPaths.contains("parried.reaction"))
             changes.add("Updated: Parried Reaction adds Both (Guard Break and Stun).");
         return changes;

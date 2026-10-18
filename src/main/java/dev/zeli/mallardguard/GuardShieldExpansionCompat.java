@@ -39,6 +39,17 @@ public final class GuardShieldExpansionCompat {
     }
     public static int blockCount(ItemStack stack){double stamina=value(stack,"stamina",-1);return stamina<0?-1:(int)Math.clamp(stamina+1,1,GuardItemBlockCounts.MAX_COUNT);}
     public static int parryTicks(ItemStack stack,int fallback){return (int)Math.clamp(value(stack,"parryTicks",fallback),1,10);}
+    /**
+     * Perfect part of a shield's own total window. Shield Expansion totals can be shorter than the configured
+     * perfect window; the perfect part is shortened so a regular part remains, unless the configuration makes the
+     * whole window perfect. Otherwise this is {@code perfect}.
+     */
+    public static int perfectTicks(ItemStack stack,int perfect,int window){
+        int total=parryTicks(stack,window);
+        if(perfect<=0)return 0;
+        if(perfect>=window||total<=1)return total;
+        return Math.min(perfect,total-1);
+    }
     public static int cooldownTicks(ItemStack stack,int fallback){return (int)Math.clamp(value(stack,"cooldownTicks",fallback),1,200);}
     public static double movement(ItemStack stack,double fallback){double factor=value(stack,"speedFactor",-1);return factor<0?fallback:Math.clamp(0.2+0.8*factor,0,1);}
     public static double explosionBlockedFraction(ItemStack stack){
