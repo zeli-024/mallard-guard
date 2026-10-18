@@ -10,6 +10,8 @@
     "PiglinGuardMixin"
   ],
   "client": [
+    "client.PlayerMovementFovMixin",
+    "client.WaddlingTailsFovMixin",
     "client.GuiAttackIndicatorMixin",
     "client.ItemInHandRendererAccessor",
     "client.MinecraftGuardInputMixin",

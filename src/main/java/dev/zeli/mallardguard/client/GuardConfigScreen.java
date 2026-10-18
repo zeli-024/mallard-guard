@@ -1077,6 +1077,17 @@ public final class GuardConfigScreen extends Screen {
         slider(name, current, minimum, binding.maximum(), suffix, divisor, server, change, description);
     }
 
+    void parriedReaction() {
+        choice("Reaction", new String[]{"Stun", "Guard Break", "Both"},
+            () -> Math.clamp(configDraft.incomingReaction - 1, 0, 2),
+            value -> {
+                configDraft.incomingReaction = value + 1;
+                dirtyShield = true;
+                rebuildWidgets();
+            },
+            "Stun stops movement, attacks and guard. Guard Break delays guarding only.\nBoth applies them together with independent durations. All modes interrupt the parried attack.");
+    }
+
     void choice(String name, String[] options, java.util.function.IntSupplier current, java.util.function.IntConsumer change, String description) {
         choice(name,options,current,change,description,true);
     }
@@ -1450,11 +1461,11 @@ public final class GuardConfigScreen extends Screen {
             case 11 -> {
                 int weaponPush = configDraft.toolPush, weaponBlocks = configDraft.toolMaxBlocks, sharedBreak = configDraft.shieldBreakTicks, sharedCap = configDraft.retaliationCap;
                 int handRule=configDraft.parryHandPriority, shieldRule=configDraft.shieldParryPriority; boolean crouchRule=configDraft.forceCrouchOffhand, cooldownRule=configDraft.cooldownPreventsGuard, emptyRule=configDraft.allowEmptyHand, foodRule=configDraft.consumablePriority;
-                String assignedCounts=configDraft.itemBlockCounts;boolean incoming=configDraft.parriedEnabled;int reaction=configDraft.incomingReaction,regularStun=configDraft.parriedGuardBreakTicks,perfectStun=configDraft.parriedStunTicks;
+                String assignedCounts=configDraft.itemBlockCounts;boolean incoming=configDraft.parriedEnabled;int reaction=configDraft.incomingReaction,guardBreakTicks=configDraft.parriedGuardBreakTicks,stunTicks=configDraft.parriedStunTicks;
                 boolean returnEnabled=configDraft.retaliationEnabled,projectileOnly=configDraft.perfectProjectilesOnly,fallOnly=configDraft.perfectFallOnly;int perfectPush=configDraft.perfectKnockbackMultiplier;
                 setShieldSettings(GuardConfig.defaultShieldSnapshot());
                 configDraft.retaliationEnabled=returnEnabled;configDraft.perfectProjectilesOnly=projectileOnly;configDraft.perfectFallOnly=fallOnly;configDraft.perfectKnockbackMultiplier=perfectPush;
-                configDraft.itemBlockCounts=assignedCounts;configDraft.incomingReaction=reaction;configDraft.parriedEnabled=incoming;configDraft.parriedGuardBreakTicks=regularStun;configDraft.parriedStunTicks=perfectStun;
+                configDraft.itemBlockCounts=assignedCounts;configDraft.incomingReaction=reaction;configDraft.parriedEnabled=incoming;configDraft.parriedGuardBreakTicks=guardBreakTicks;configDraft.parriedStunTicks=stunTicks;
                 configDraft.toolPush = weaponPush; configDraft.toolMaxBlocks = weaponBlocks; configDraft.shieldBreakTicks = sharedBreak; configDraft.retaliationCap = sharedCap;
                 configDraft.parryHandPriority=handRule;configDraft.shieldParryPriority=shieldRule;configDraft.forceCrouchOffhand=crouchRule;configDraft.cooldownPreventsGuard=cooldownRule; configDraft.allowEmptyHand = emptyRule; configDraft.consumablePriority = foodRule;
                 configDraft.shieldItems = d.shieldItems(); configDraft.shieldBlacklist=GuardConfig.SHIELD_BLACKLIST.getDefault(); dirtyShield = true;

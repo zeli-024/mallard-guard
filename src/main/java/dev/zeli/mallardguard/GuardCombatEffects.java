@@ -167,16 +167,17 @@ public final class GuardCombatEffects {
         if(ticks<=0)return;Stun old=STUNNED.get(target);int remaining=Math.max(ticks,old==null?0:old.remaining());STUNNED.put(target,new Stun(remaining,old==null));stopRangedUse(target);if(target instanceof ServerPlayer player)PacketDistributor.sendToPlayer(player,new GuardPackets.StunState(remaining));
     }
     /** The direct attack outcome is authoritative; feedback packets only describe it. */
-    public static int incomingParry(ServerPlayer attacker){
-        int mode=GuardConfig.INCOMING_REACTION.get();
-        if(mode==0||!GuardConfig.PARRIED_ENABLED.get())return 0;
-        int ticks=(mode==1?GuardConfig.PARRIED_STUN_TICKS:GuardConfig.PARRIED_GUARD_BREAK_TICKS).get();
-        if(ticks>0){
-            if(mode==1){stun(attacker,ticks);GuardState.input(attacker,false,false);}
-            else GuardState.parriedGuardBreak(attacker,ticks);
-        }
-        attacker.swinging=false;
-        Stun state=STUNNED.get(attacker);return state==null?0:state.remaining();
+    public static int incomingParry(ServerPlayer attacker) {
+        int mode = GuardConfig.INCOMING_REACTION.get();
+        if (mode == 0 || !GuardConfig.PARRIED_ENABLED.get()) return 0;
+        int stunTicks = mode == 1 || mode == 3 ? GuardConfig.PARRIED_STUN_TICKS.get() : 0;
+        int guardBreakTicks = mode == 2 || mode == 3 ? GuardConfig.PARRIED_GUARD_BREAK_TICKS.get() : 0;
+        if (stunTicks > 0) stun(attacker, stunTicks);
+        if (guardBreakTicks > 0) GuardState.parriedGuardBreak(attacker, guardBreakTicks);
+        else if (stunTicks > 0) GuardState.input(attacker, false, false);
+        attacker.swinging = false;
+        Stun state = STUNNED.get(attacker);
+        return state == null ? 0 : state.remaining();
     }
     public static boolean stunned(Entity entity) {
         // Integrated clients share these statics with the server; never touch its weak map from the client thread.

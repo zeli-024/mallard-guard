@@ -9,6 +9,12 @@ final class GuardConfigMigration {
     private GuardConfigMigration() {}
     private record DefaultChange(int revision, String path, String previous, String current) {}
     private static final List<DefaultChange> DEFAULT_CHANGES = List.of(
+        new DefaultChange(103,"timing.perfectTicks","2","6"),
+        new DefaultChange(103,"timing.parryTicks","4","9"),
+        new DefaultChange(103,"shields.perfectTicks","2","6"),
+        new DefaultChange(103,"shields.parryTicks","4","9"),
+        new DefaultChange(103,"parried.guardBreakTicks","10","15"),
+        new DefaultChange(103,"parried.stunTicks","10","15"),
         new DefaultChange(102,"mobs.tracerStartColor","16711680","16777215"),
         new DefaultChange(102,"mobs.tracerMiddleColor","16711680","16777215"),
         new DefaultChange(102,"mobs.tracerEndColor","16711680","16777215"),
@@ -245,6 +251,8 @@ final class GuardConfigMigration {
                 && currentPaths.contains(change.path()))
                 changes.add("Default changed: " + label(change.path()) + " (" + change.previous() + " -> " + change.current() + ")");
         }
+        if (oldRevision < 103 && currentPaths.contains("parried.reaction"))
+            changes.add("Updated: Parried Reaction adds Both (Guard Break and Stun).");
         return changes;
     }
     static int revisionIn(byte[] bytes) {

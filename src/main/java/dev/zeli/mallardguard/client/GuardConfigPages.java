@@ -54,10 +54,10 @@ final class GuardConfigPages {
                 screen.sliderBound(Control.SHIELD_PARRY_PUSHBACK_PERCENT,"Attacker Knockback",()->screen.configDraft.shieldRegularPush,"%",1,true,v->{screen.configDraft.shieldRegularPush=v;screen.dirtyShield=true;},"Attacker push on regular shield parries. Perfect shield parries use the separate area pushback.");
                 screen.sliderBound(Control.SHIELD_PERFECT_TICKS, "Shield perfect window", () -> screen.configDraft.shieldPerfect, " ticks", 1, true, v -> {
                     screen.configDraft.shieldPerfect = Math.min(v, screen.configDraft.shieldWindow); screen.dirtyShield = true;
-                }, "Perfect parry timing for shields. It must fit within the total shield parry window. 0 disables shield perfect parries.");
+                }, "Perfect parry timing for shields. It must fit within the total shield parry window. 0 disables shield perfect parries. Default: 6 ticks.");
                 screen.sliderBound(Control.SHIELD_PARRY_TICKS, "Shield parry window", () -> screen.configDraft.shieldWindow, " ticks", 1, true, v -> {
                     screen.configDraft.shieldWindow = v; screen.configDraft.shieldPerfect = Math.min(screen.configDraft.shieldPerfect, v); screen.dirtyShield = true;
-                }, "Total shield parry time, including its perfect window. Lowering this also limits perfect parry timing. Shield use continues into blocking until you release guard or guard breaks.");
+                }, "Total shield parry time, including its perfect window. Default: 9 ticks (6 perfect, then 3 regular). Lowering this also limits perfect timing. Shield use continues into blocking until release or guard break.");
                 screen.sliderBound(Control.SHIELD_RECHARGE_TICKS, "Shield parry recharge", () -> screen.configDraft.shieldRechargeTicks, " ticks", 1, true, v -> { screen.configDraft.shieldRechargeTicks = v; screen.dirtyShield = true; }, "Time before another shield parry after releasing guard. Regular shield parries halve it; perfect shield parries reset it. Separate from the guard break penalty.");
                 screen.sliderBound(Control.SHIELD_MAX_BLOCKS, "Shield blocks before break", () -> screen.configDraft.shieldMaxBlocks, "", 1, true, v -> { screen.configDraft.shieldMaxBlocks = v; screen.dirtyShield = true; }, "Successful shield blocks allowed before the guard ends. 0 allows unlimited blocks. A disabled shield still follows vanilla's cooldown.");
                 }
@@ -207,17 +207,20 @@ final class GuardConfigPages {
         var d=screen.configDraft;
         screen.featureDivider("Parrying",()->screen.timingOpen,()->d.parry,v->d.parry=v,true,"Timed parries and their windows.");
         if(screen.timingOpen&&d.parry){
-            screen.sliderBound(Control.PERFECT_TICKS,"Perfect Window",()->d.perfect," ticks",1,true,v->d.perfect=Math.min(v,d.window),"Perfect timing at the start of the total parry window. 0 disables perfect parries.");
-            screen.sliderBound(Control.PARRY_TICKS,"Parry Window",()->d.window," ticks",1,true,v->{d.window=v;d.perfect=Math.min(d.perfect,v);},"Total time to catch a hit, including perfect timing.");
+            screen.sliderBound(Control.PERFECT_TICKS,"Perfect Window",()->d.perfect," ticks",1,true,v->d.perfect=Math.min(v,d.window),"Perfect timing at the start of the total parry window. 0 disables perfect parries. Default: 6 ticks.");
+            screen.sliderBound(Control.PARRY_TICKS,"Parry Window",()->d.window," ticks",1,true,v->{d.window=v;d.perfect=Math.min(d.perfect,v);},"Total time to catch a hit, including perfect timing. Default: 9 ticks (6 perfect, then 3 regular).");
             screen.sliderBound(Control.RECHARGE_TICKS,"Recharge",()->d.recharge," ticks",1,true,v->d.recharge=v,"Wait before another parry attempt.");
             screen.sliderBound(Control.FACING_ANGLE,"Facing Angle",()->d.angle,"°",1,true,v->d.angle=v,"180° covers the front half; 360° covers all directions.");
             screen.sliderBound(Control.FOLLOW_UP_TICKS,"Follow-up Parries",()->d.followUp," ticks",1,true,v->d.followUp=v,"Catch additional valid hits after success. These hits do not extend the timer. Default: 5 ticks.");
         }
         screen.featureDivider("Parried",()->screen.whenParriedOpen,()->d.parriedEnabled,v->{d.parriedEnabled=v;if(v)d.incomingReaction=Math.max(1,d.incomingReaction);screen.dirtyShield=true;},true,"Gameplay reaction when your attack is parried. Uses the shared client feedback settings.");
         if(screen.whenParriedOpen&&d.parriedEnabled){
-            screen.choice("Reaction",new String[]{"Stun","Guard Break"},()->Math.max(0,d.incomingReaction-1),v->{d.incomingReaction=v+1;screen.dirtyShield=true;},"Stun stops movement, attacks and guard. Guard Break delays guard recharge only. Both interrupt the parried attack.");
-            screen.sliderBound(Control.PARRIED_GUARD_BREAK_TICKS,"Guard Break Duration",()->d.parriedGuardBreakTicks," ticks",1,true,v->{d.parriedGuardBreakTicks=v;screen.dirtyShield=true;},"Recharge penalty in Guard Break mode. Default: 10 ticks; maximum: 60.");
-            screen.sliderBound(Control.PARRIED_STUN_TICKS,"Stun Duration",()->d.parriedStunTicks," ticks",1,true,v->{d.parriedStunTicks=v;screen.dirtyShield=true;},"Restriction in Stun mode. Default: 10 ticks; maximum: 60.");
+            screen.parriedReaction();
+            screen.controls(d.incomingReaction == 2 || d.incomingReaction == 3);
+            screen.sliderBound(Control.PARRIED_GUARD_BREAK_TICKS,"Guard Break Duration",()->d.parriedGuardBreakTicks," ticks",1,true,v->{d.parriedGuardBreakTicks=v;screen.dirtyShield=true;},"Recharge penalty in Guard Break or Both mode. Default: 15 ticks; maximum: 60. 0 disables this penalty.");
+            screen.controls(d.incomingReaction == 1 || d.incomingReaction == 3);
+            screen.sliderBound(Control.PARRIED_STUN_TICKS,"Stun Duration",()->d.parriedStunTicks," ticks",1,true,v->{d.parriedStunTicks=v;screen.dirtyShield=true;},"Movement, attack and guard restriction in Stun or Both mode. Default: 15 ticks; maximum: 60. 0 disables stun.");
+            screen.controls(true);
         }
         screen.dropdown("Health",()->screen.healingOpen,"Healing and damage returned on parries.");
         if(screen.healingOpen){

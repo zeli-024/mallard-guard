@@ -9,6 +9,7 @@ public final class GuardMixinPlugin implements IMixinConfigPlugin {
     public void onLoad(String pkg) {}
     public String getRefMapperConfig() { return null; }
     public boolean shouldApplyMixin(String target, String mixin) {
+        if (mixin.endsWith("WaddlingTailsFovMixin")) return LoadingModList.get().getModFileById("waddletrail") != null;
         if (mixin.endsWith("EmfGuardPoseMixin")) return LoadingModList.get().getModFileById("entity_model_features") != null;
         if (mixin.endsWith("BetterCombatGuardMixin")) return LoadingModList.get().getModFileById("bettercombat") != null;
         if (mixin.contains("Punchy")) {

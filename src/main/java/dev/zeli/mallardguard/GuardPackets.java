@@ -417,7 +417,7 @@ public final class GuardPackets {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("76");
+        PayloadRegistrar registrar = event.registrar("77");
         registrar.playToServer(SetPalette.TYPE, SetPalette.CODEC, GuardPlayerPalettes::receivePalette);
         registrar.playToClient(PlayerPalette.TYPE, PlayerPalette.CODEC, (data, context) -> GuardClient.playerPalette(data));
         registrar.playToServer(FeintEnded.TYPE, FeintEnded.CODEC, (data, context) -> {

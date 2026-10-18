@@ -34,7 +34,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.client.event.ComputeFovModifierEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -42,9 +41,6 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.bus.api.EventPriority;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import org.lwjgl.glfw.GLFW;
 
 @EventBusSubscriber(modid = MallardGuard.ID, value = Dist.CLIENT)
@@ -485,37 +481,6 @@ public final class GuardClient {
         long start=shakeStart(),age=System.currentTimeMillis()-start;
         return start!=0&&age>=0&&age<shakeDuration(perfect)&&shakeStrength(perfect)>0;
     }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void keepGuardSpeedOutOfFov(ComputeFovModifierEvent event) {
-        Minecraft mc=Minecraft.getInstance();if(mc.player==null||event.getPlayer()!=mc.player)return;
-        double effectScale=mc.options.fovEffectScale().get();
-        // NeoForge has already applied this accessibility setting to the event's current value.
-        if(effectScale<=0 || !Double.isFinite(effectScale))return;
-        AttributeInstance speed=mc.player.getAttribute(Attributes.MOVEMENT_SPEED);
-        double walking=mc.player.getAbilities().getWalkingSpeed();
-        if(speed!=null&&walking>0&&(speed.getModifier(GuardState.GUARD_SLOWDOWN)!=null||speed.getModifier(GuardCombatEffects.STUN_SPEED)!=null)){
-            double base=speed.getBaseValue(),sum=0;var modifiers=speed.getModifiers();
-            for(AttributeModifier modifier:modifiers)if(!ourSpeedModifier(modifier)){
-                if(modifier.operation()==AttributeModifier.Operation.ADD_VALUE)base+=modifier.amount();
-                else if(modifier.operation()==AttributeModifier.Operation.ADD_MULTIPLIED_BASE)sum+=modifier.amount();
-            }
-            double unguarded=base*(1+sum);
-            for(AttributeModifier modifier:modifiers)if(!ourSpeedModifier(modifier)&&modifier.operation()==AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL)unguarded*=1+modifier.amount();
-            double cleanSpeed=speed.getAttribute().value().sanitizeValue(unguarded);
-            double currentFactor=(speed.getValue()/walking+1)*0.5D,cleanFactor=(cleanSpeed/walking+1)*0.5D;
-            if(currentFactor<=0 || !Double.isFinite(cleanFactor))return;
-            // Retain vanilla's flight/item-use factors, then interpolate both baselines before
-            // removing our movement contribution. Earlier listeners keep their relative multiplier.
-            double raw=event.getFovModifier();
-            double scaledOriginal=1+effectScale*(raw-1);
-            double scaledClean=1+effectScale*(raw*cleanFactor/currentFactor-1);
-            if(scaledOriginal>0 && Double.isFinite(scaledClean))
-                event.setNewFovModifier((float)(event.getNewFovModifier()*scaledClean/scaledOriginal));
-        }
-
-    }
-    private static boolean ourSpeedModifier(AttributeModifier modifier){return modifier.id().equals(GuardState.GUARD_SLOWDOWN)||modifier.id().equals(GuardCombatEffects.STUN_SPEED);}
 
     private static void clearCombatState(Minecraft mc){
         ++feedbackSequence; // Invalidate queued feedback from the previous life.
