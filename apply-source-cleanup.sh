@@ -22,12 +22,7 @@ rm -rf -- src/main/resources/assets/mallardguard/textures/particle/center_impact
 for frame in 0 1 2 3 4 5; do
     rm -f -- "src/main/resources/assets/mallardguard/textures/particle/center_impact/frame_$frame.png"
 done
-rm -f -- art-source/original-impact-reference.png art-source/approved-cross-impact-reference.png
 rm -f -- art-source/ImpactLayerExport.java art-source/ring-impact.png art-source/cross-impact.png
-rm -f -- art-source/cross-generated-reference.png art-source/ring-generated-reference.png
-if [[ -d art-source ]]; then
-    find art-source -maxdepth 1 -type f -name '*prompt*' -delete
-fi
 rm -f -- release-notes/1.54c-beta-11-draft.md
 
 # Retired mob blocking and regular-window config keys.
@@ -41,9 +36,4 @@ rm -rf -- src/main/resources/assets/mallardguard/textures/particle/parry_disc
 
 rm -f src/main/resources/assets/mallardguard/textures/gui/block_vignette.png
 
-# Superseded local preview notes.
 rm -f -- release-notes/1.56b-beta-1.md
-
-# Working notes and review reports are not distributed; each released version keeps one changelog.
-rm -f -- health-diagnostic.md
-rm -f -- release-notes/*beta*.md

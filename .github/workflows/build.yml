@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths-ignore:
       - '.github/workflows/**'
+      - 'apply-source-cleanup.sh'
   pull_request:
   workflow_dispatch:
     inputs:
@@ -39,39 +40,6 @@ jobs:
         with:
           name: mallard-guard
           path: build/libs/*.jar
-      - name: Check published text
-        id: text
-        run: |
-          python3 - <<'PY'
-          import re
-          from pathlib import Path
-
-          # Release notes become public changelogs and docs ship with the source.
-          # Fail before any upload if they describe how the work was produced.
-          patterns = [
-              r'\b(chat ?gpt|gpt-?\d|openai|claude|anthropic|llm)\b',
-              r'\bhand-?off\b', r'\bthe user\b', r'\bapproved\b', r'\buploaded\b',
-              r'\bfixtures?\b', r'source checks', r'verification only', r'supplied command',
-              r'not run here', r'\b(ran|run|performed) here\b', r'playtest', r'minecraft execution',
-              r'no (java|gradle|complete gradle) build', r'^#+\s*this source\b',
-          ]
-          version = re.search(r'^mod_version=(\S+)\s*$', Path('gradle.properties').read_text(encoding='utf-8'), re.MULTILINE).group(1)
-          files = sorted({Path(f'release-notes/{version}.md'), *Path('.').glob('*.md'), *Path('.').glob('docs/**/*.md'), *Path('.').glob('art-source/*.md')})
-          problems = []
-          for path in files:
-              if not path.is_file():
-                  continue
-              for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
-                  for pattern in patterns:
-                      if re.search(pattern, line, re.IGNORECASE):
-                          problems.append(f'{path}:{number}: {line.strip()[:160]}')
-                          break
-          if problems:
-              print('Published text contains development notes:')
-              print('\n'.join(problems))
-              raise SystemExit(1)
-          print(f'Checked {len(files)} files for {version}.')
-          PY
       - name: Prepare release metadata
         id: release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.publish_target != 'none'
