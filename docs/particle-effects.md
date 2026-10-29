@@ -1,6 +1,6 @@
 # Particle effects
 
-Flying Sparks, Spark Debris and Spark Tracers share a parry origin, an upward-favored spherical launch distribution and one bounded head budget (512 heads per burst, 1024 active). Shield Forward Bias, inside Spark Tracers and On by default, favors the defender's facing while keeping side and rear directions; it affects all three families. Fall parries use a horizontal ring with slight vertical variation instead. Each family has its own motion, drag, gravity, collisions and rendering.
+Flying Sparks, Spark Debris and Spark Tracers scatter from the parry point, mostly upward. Shield Forward Bias favors the defender's facing for all three effects; fall parries scatter in a horizontal ring. Each effect has its own motion, gravity and collisions.
 
 ## Amount
 
@@ -21,7 +21,7 @@ Defaults for all three families: 6% Base, 125% Perfect and 2% Damage Scaling.
 
 Flying Sparks normally live for 50–100% of their lifetime; 12% linger for 110–135%. Flying Size Variance defaults to 50%, giving a 0.55–1.60 spawn-size range. Spark Tracer tails last 1–4 ticks (default 2) and are drawn as tick-stepped squares.
 
-Each family and the Center Impact has its own On/Off switch in its section header. Turning one off stops spawning without changing its saved sliders.
+Each effect has an On/Off switch in its section header.
 
 ## Center Impact
 
@@ -31,10 +31,6 @@ A stationary, camera-facing six-frame animation made of six 64×64 white artwork
 
 All player and mob spark colors default to white (#FFFFFF). Spark Tracers use a Start/Middle/End palette across their lifetime, and the Center Impact uses the same palette. Regular and perfect parries share it.
 
-Player colors (Flying Sparks, Spark Debris and the tracer palette) are shared with other players when joining and when a changed palette is applied. The server stores one palette per connected player, and each burst references it by a small numeric ID. Late joiners receive the current palettes. Palettes survive respawns and dimension changes and are removed on logout and server shutdown. Each burst captures its colors before any hitlag delay, so separate bursts never share mutable color state. Only colors are shared: each viewer keeps their own intensity, size, lifetime and On/Off preferences unless the server enforces that category.
+Other players see your chosen colors. Each viewer controls particle amounts, sizes, lifetimes and visibility unless the server overrides them.
 
-Server enforcement overrides shared player palettes; disabling enforcement restores the players' own colors. Mob spark colors and their Center Impact always come from server settings, with separate Flying Sparks and Spark Debris colors and a tracer palette captured with each mob burst. Server config reloads redistribute the policy and cached palettes.
-
-## Rendering and lifecycle
-
-All effect geometry is drawn in the shared particle-atlas batch. Active lists are bounded and cleared on world and session changes. Death clears player-specific HUD feedback without removing other players' world effects. One shared monitor guards Mallard Guard's particle ticks, histories, rendering, palette publication and collision profiling, so its particles remain safe when another mod ticks particles asynchronously. Other mods' particle settings are not changed.
+Server overrides can replace player colors. Mob colors always come from server settings, including separate Flying Sparks and Spark Debris colors and a tracer palette shared with Center Impact.

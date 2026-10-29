@@ -74,7 +74,7 @@ final class GuardPoseManagerScreen extends Screen {
         choices.add(new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)));
         GuardUi.choices(this,"Edit "+targets.size()+" presets","Timing and item edits replace those values\non every selected preset.",choices.toArray(GuardUi.Choice[]::new));
     }
-    private void help(){GuardUi.choices(this,"Preset Help","PRESETS\nClick a row to edit its guarding and parried poses.\nEnabled / Disabled controls whether a preset can be used.\nUse the pencil to rename; Delete asks for confirmation.\nEnabled matching presets are chosen randomly.\n\nBATCH EDITING\nSelect several presets, then choose Batch Actions.\nSelect Results includes off-screen search matches.\n\nSAVING\nSave in the editor commits its draft.\nPreset actions save immediately.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)));}
+    private void help(){GuardUi.choices(this,"Preset Help","Open a preset to edit its poses. Enabled matching presets are chosen randomly; use the pencil to rename one.\n\nBatch Actions edits several presets together. Select Results includes offscreen search matches.\n\nSave in the editor commits the preset. Other preset actions save immediately.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)));}
     @Override protected void init(){
         layout=GuardUiLayout.poseBrowser(width,height);
         String query=searchText.strip().toLowerCase(Locale.ROOT);

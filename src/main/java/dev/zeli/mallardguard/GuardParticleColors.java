@@ -59,23 +59,23 @@ public final class GuardParticleColors {
     }
     public static String unit(int i){if(lifetimeSlot(i)||i==IMPACT_DURATION||i==TRACER_TRAIL_TICKS)return " ticks";if(i==IMPACT_SPIN)return "°/s";return "%";}
     public static String tip(int i){
-        if(i>=FLYING_ENABLED&&i<=IMPACT_ENABLED)return "Enable this effect without changing its intensity or appearance.\nOff stops new particles from spawning. Default: On.";
-        if(i==IMPACT_SIZE)return "Scale of the six-frame impact at the shared hit origin.\n0% turns only the animated impact off. Default: 250%.";
-        if(i==IMPACT_SPIN)return "Spin speed; each impact randomly chooses left or right.\nIts starting angle is always randomized. Default: 45°/s.";
-        if(i==IMPACT_OPACITY)return "Visibility of the entire animated impact.\n0% hides it; source transparency remains. Default: 100%.";
-        if(i==IMPACT_DURATION)return "Total lifetime and playback time for all six frames.\nLonger is slower. 20 ticks = 1 second. Default: 8 ticks.";
-        if(i==SHIELD_FORWARD_BIAS)return "Favor forward launches on shield parries, with side and rear sparks.\nApplies to all three spark types; fall parries use a ring. Default: On.";
-        if(lifetimeSlot(i))return "Base lifetime before the existing per-particle variance.\n20 ticks = 1 second; tails finish separately. Default: "+DEFAULTS[i-OFFSET]+" ticks.";
+        if(i>=FLYING_ENABLED&&i<=IMPACT_ENABLED)return "Show this particle effect.";
+        if(i==IMPACT_SIZE)return "Size of the center impact. 0% hides it.";
+        if(i==IMPACT_SPIN)return "Rotation speed; each impact spins in a random direction.";
+        if(i==IMPACT_OPACITY)return "Opacity of the center impact. 0% hides it.";
+        if(i==IMPACT_DURATION)return "Playback time for the full impact animation. Longer values slow it down.";
+        if(i==SHIELD_FORWARD_BIAS)return "Favor forward launches for all three spark types on shield parries. Fall parries use a ring.";
+        if(lifetimeSlot(i))return "Particle lifetime before random variation. 20 ticks = one second.";
         if(colorSlot(i)){
-            if(i==TRACER_START_COLOR)return "Head and new tail color before fading.\nAlso colors the beginning of the center impact.";
-            if(i==TRACER_MIDDLE_COLOR)return "Color halfway through fading.\nAlso colors the middle of the center impact.";
-            if(i==TRACER_END_COLOR)return "Final color near disappearance.\nAlso colors the end of the center impact.";
-            if(i==DEBRIS_COLOR)return "Debris color; colored sparks vary toward warmer shades.\nWhite stays white. Click the preview or enter a hex code.";
-            return "Flying Spark color, kept throughout life.\nSaturation varies from 70–100% at spawn; white stays white.";
+            if(i==TRACER_START_COLOR)return "Starting color of tracers and the center impact.";
+            if(i==TRACER_MIDDLE_COLOR)return "Middle color of tracers and the center impact.";
+            if(i==TRACER_END_COLOR)return "Final color of tracers and the center impact.";
+            if(i==DEBRIS_COLOR)return "Debris color, with slight warm variations. White stays white.";
+            return "Flying spark color, with slight saturation variations. White stays white.";
         }
-        if(i==TRACER_TRAIL_TICKS)return "Tail group lifetime before shared variance; range 1–4 ticks.\nLonger tails keep more squares. Default: 2 ticks.";
-        if(i==FLYING_SIZE_VARIANCE)return "Random size per spark. Higher values widen the range.\n0% uses one size. Default: 50%.";
-        return "Visual size; physics stay the same. 0% disables this particle.\n100% is the original size. Default: "+DEFAULTS[i-OFFSET]+"%.";
+        if(i==TRACER_TRAIL_TICKS)return "How long tracer tails remain visible.";
+        if(i==FLYING_SIZE_VARIANCE)return "Random size variation. 0% makes every spark the same size.";
+        return "Particle size. 0% hides it; 100% is its original size.";
     }
     public static void define(ModConfigSpec.Builder b){for(int k=0;k<VALUES.length;k++){int i=OFFSET+k;if(!retired(i))VALUES[k]=GuardSettingRanges.integer(b.comment(tip(i)), KEYS[k],DEFAULTS[k],min(i),max(i));}FLYING_COLOR=VALUES[0];}
     public static int get(int i){return retired(i)?0:VALUES[i-OFFSET].get();}

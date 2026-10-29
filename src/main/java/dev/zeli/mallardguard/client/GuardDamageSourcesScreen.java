@@ -74,7 +74,7 @@ final class GuardDamageSourcesScreen extends Screen {
         search.setTooltip(GuardUi.tooltip("Filter this list by source ID, name or @mod. Use #enabled or #disabled to filter parry rules."));
         search.setResponder(text->{query=text;offset=0;filter();refreshRows();});
         refreshRows();
-        var help=addRenderableWidget(GuardUi.button("?",left+w-28,top+4,20,20,()->GuardUi.choices(this,"Damage Sources Help","BROWSE\nRecent Hits shows the last ten damage types.\nAll Sources shows the server's full catalogue.\n\nSEARCH\nUse a source ID or mod name.\n@mod filters a namespace; #enabled and #disabled filter rules.\n\nRULES\nOn allows this source to be parried, subject to normal eligibility.\nOff excludes it. Other parry settings still apply.\nDone returns these edits to the draft; Apply saves them.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)))));
+        var help=addRenderableWidget(GuardUi.button("?",left+w-28,top+4,20,20,()->GuardUi.choices(this,"Damage Sources Help","Recent Hits lists the last ten damage types; All Sources lists the server catalogue. Search IDs or mod names, @mod namespaces, or #enabled and #disabled rules.\n\nOn permits parrying that source, subject to normal eligibility; Off excludes it. Done returns edits to settings. Apply there saves them.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)))));
         help.setTooltip(GuardUi.tooltip("Help with searching, rules and saving."));
         var done=addRenderableWidget(GuardUi.button("Done",left+w-INSET-78,layout.footerY(),78,20,this::onClose));
         done.setTooltip(GuardUi.tooltip("Return to settings. Use Apply there to save these rules."));

@@ -965,7 +965,7 @@ public final class GuardClient {
         graphics.flush();
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         if (memeIndex == 3) {
-            // Brighten the darker Plankton still while preserving its visible face.
+            // A brief white overlay lifts the darker image.
             float burst = Math.max(0.0F, 1.0F - age / 180.0F);
             int brightness = Math.round((85.0F + 95.0F * burst) * alpha);
             graphics.fill(0, 0, width, height, brightness << 24 | 0xFFFFFF);

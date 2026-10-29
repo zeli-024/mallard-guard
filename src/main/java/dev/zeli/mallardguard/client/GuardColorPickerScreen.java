@@ -33,7 +33,7 @@ final class GuardColorPickerScreen extends Screen {
         hex=addRenderableWidget(GuardUi.editBox(font,left+90,top+161,102,"Hex color"));
         hex.setMaxLength(7);hex.setValue(String.format("#%06X",color()));
         hex.setResponder(text->{if(syncing)return;String raw=text.startsWith("#")?text.substring(1):text;if(!raw.matches("[0-9a-fA-F]{6}"))return;double[] hsv=GuardColorPickerMath.hsv(Integer.parseInt(raw,16));hue=hsv[0];saturation=hsv[1];value=hsv[2];updateTexture();});
-        addRenderableWidget(GuardUi.button("?",left+196,top+161,20,20,()->GuardUi.choices(this,"Color Help","PICK A COLOR\nThe wheel selects hue.\nThe triangle selects saturation and brightness.\n\nHEX VALUE\nEnter six hexadecimal digits, such as #FFFFFF.\nApply saves the color; Cancel leaves it unchanged.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)))));
+        addRenderableWidget(GuardUi.button("?",left+196,top+161,20,20,()->GuardUi.choices(this,"Color Help","Choose hue on the wheel and saturation and brightness in the triangle, or enter a six-digit hex color such as #FFFFFF.\n\nApply uses the color; Cancel leaves it unchanged.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)))));
         addRenderableWidget(GuardUi.button("Apply",left+16,top+194,92,20,()->{accept.accept(color());onClose();}));
         addRenderableWidget(GuardUi.button("Cancel",left+116,top+194,92,20,this::onClose));
     }

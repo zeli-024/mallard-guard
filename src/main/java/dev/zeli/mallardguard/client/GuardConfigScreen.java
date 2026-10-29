@@ -398,7 +398,7 @@ public final class GuardConfigScreen extends Screen {
         tip(modPage,"Open Mallard Guard's CurseForge page.");
         Button report=addRenderableWidget(GuardUi.iconButton("github","Issue Tracker",sidebarLeft+sidebarWidth-21,layoutTop+7,18,()->GuardUi.openLink(this,"Issue Tracker","https://github.com/zeli-024/Mallard-Guard/issues")));
         reportButton=report;tip(report,"Open the GitHub issue tracker.");
-        Button help=addRenderableWidget(GuardUi.button("?",sidebarLeft+sidebarWidth-45,layoutTop+7,18,18,()->GuardUi.choices(this,"Config Help","EDITING\nClick a category, then a divider to open its controls.\nScroll within the settings list. Hover controls for details.\n\nVALUES\nScroll a slider for precise changes; Shift-scroll moves ten steps.\nYellow marks changed values. Undo restores the saved value.\n\nSAVING\nApply saves your edits. Reset restores defaults in the draft.\nServer settings require operator permission.\nLocked client settings are controlled by the server.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)))));
+        Button help=addRenderableWidget(GuardUi.button("?",sidebarLeft+sidebarWidth-45,layoutTop+7,18,18,()->GuardUi.choices(this,"Config Help","Open a category and divider to find settings. Scroll sliders for fine adjustment; Shift-scroll moves ten steps. Yellow marks unsaved changes.\n\nApply saves the draft. Undo restores saved values; Reset puts defaults in the draft. Server settings require operator permission, and server overrides can lock client settings.",new GuardUi.Choice("Back",()->Minecraft.getInstance().setScreen(this)))));
         tip(help,"Help with navigation, editing and saving.");
         int actionWidth=(sidebarWidth-22)/2, actionHeight=height<220?16:20, actionTop=height-(height<220?43:56), actionBottom=height-(height<220?23:32);
         Button reset=addRenderableWidget(GuardUi.button("Reset",sidebarLeft+8,actionTop,sidebarWidth-16,actionHeight,()->confirmReset(true)));
@@ -929,13 +929,13 @@ public final class GuardConfigScreen extends Screen {
     }
     void buildFeedback(boolean server){
         if(feedbackSection(server,"Hitlag",GuardScreenSettings.HITLAG_ENABLED,GuardScreenSettings.tip(GuardScreenSettings.HITLAG_ENABLED))){
-            feedbackToggle(server,GuardScreenSettings.HITLAG_PERFECT_ONLY,"Perfect Only","Only perfect parries freeze the view. Hidden regular values are preserved.");
+            feedbackToggle(server,GuardScreenSettings.HITLAG_PERFECT_ONLY,"Perfect Only","Freeze the view only on perfect parries.");
             feedbackSlider(server,3,"Hitlag Duration"," ticks","Local freeze duration. 20 ticks = one second.");
             if(feedbackValue(server,GuardScreenSettings.HITLAG_PERFECT_ONLY)==0)feedbackSlider(server,62,"Regular Duration"," ticks","Local regular-parry freeze. 0 disables it.");
         }
-        if(feedbackSection(server,"Impact Frame",34,"Brief high-contrast, grayscale treatment of your view.\nUses the corresponding hitlag duration.\nFor the best effect, set perfect hitlag to 6 ticks.")){
+        if(feedbackSection(server,"Impact Frame",34,"A brief grayscale flash lasting as long as the configured hitlag.")){
             feedbackToggle(server,35,"Perfect Only","Only perfect parries use Impact Frame. Default: On.");
-            feedbackPreview(server,"Preview",()->openImpactPreview(server),"Adjust the appearance against a paused scene.\nUses hitlag duration even when hitlag is disabled.");
+            feedbackPreview(server,"Preview",()->openImpactPreview(server),"Preview the impact against a paused scene. Duration follows hitlag settings, even with hitlag off.");
         }
         if(feedbackSection(server,"White Flash",2,"Briefly washes your view in white when a parry succeeds.\nIntensity controls how visible the flash is.")){
             feedbackToggle(server,27,"Perfect Only","Only perfect parries show White Flash.");

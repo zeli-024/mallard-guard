@@ -28,26 +28,3 @@ tasks.named('processResources', ProcessResources) {
     inputs.properties values
     filesMatching('META-INF/neoforge.mods.toml') { expand values }
 }
-
-// Keep the Linux home jars/ folder in sync after a successful build. An unsuccessful
-// build never replaces or deletes the previous playable jar.
-tasks.named('build') {
-    doLast {
-        def builtJar = tasks.named('jar', Jar).get().archiveFile.get().asFile
-        if (!builtJar.isFile()) throw new GradleException("Mallard Guard jar is missing: ${builtJar}")
-
-        def destination = new File(System.getProperty('user.home'), 'jars')
-        if (!destination.isDirectory() && !destination.mkdirs())
-            throw new GradleException("Cannot create Mallard Guard output folder: ${destination}")
-        java.nio.file.Files.copy(builtJar.toPath(), new File(destination, builtJar.name).toPath(),
-            java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-        // Delete only older Mallard Guard jars, leaving other files untouched.
-        destination.listFiles()?.findAll {
-            it.isFile() && it.name.startsWith('mallardguard-') && it.name.endsWith('.jar')
-                && it.name != builtJar.name
-        }?.each { oldJar ->
-            if (!oldJar.delete()) throw new GradleException("Cannot remove old Mallard Guard jar: ${oldJar}")
-        }
-        println "Mallard Guard jar ready: ${new File(destination, builtJar.name)}"
-    }
-}

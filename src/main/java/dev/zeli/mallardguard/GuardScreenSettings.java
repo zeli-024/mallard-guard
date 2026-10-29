@@ -56,7 +56,7 @@ public final class GuardScreenSettings {
         control(0,"cameraShakeEnabled","Camera Shake",1,0,1,"","Briefly shakes your view during parry feedback. Strength and duration control the motion.");
         control(1,"chromaticEnabled","Chromatic Aberration",1,0,1,"","Slightly separates red, green and blue channels, creating a brief color fringe around edges.");
         control(2,"hitlagEnabled","Hitlag",1,0,1,"","Briefly holds your view on the impact to emphasize the parry. Only your view freezes; server combat continues.");
-        control(3,"hitlagPerfectOnly","Perfect Only",0,0,1,"","Hitlag only on perfect parries. Regular duration is kept while hidden.");
+        control(3,"hitlagPerfectOnly","Perfect Only",0,0,1,"","Freeze the view only on perfect parries.");
         control(11,"targetHighlightEnabled","Target Highlight",0,0,1,"","Highlight the opposing participant and dim the world. Only the two participants see it.");
         control(12,"targetHighlightDim","World Dim",60,0,100,"%","World darkening. The opponent silhouette and HUD retain their brightness.");
         control(14,"targetHighlightGlow","Glow Strength",80,0,100,"%","Color strength inside the opponent silhouette. Texture transparency is respected.");

@@ -174,7 +174,7 @@ final class GuardConfigPages {
     }
     static void buildWorldParticles(GuardConfigScreen screen,boolean server){
         int[] target=server?screen.configDraft.enforcedDefaults:screen.configDraft.extraClient;
-        screen.featureDivider("Flying Sparks", () -> screen.animatedOpen, () -> target[GuardParticleColors.FLYING_ENABLED]!=0, value -> target[GuardParticleColors.FLYING_ENABLED]=value?1:0, server, "Uneven bursts with animated firework sparks and occasional electric sparks. On/Off preserves your intensity settings.");
+        screen.featureDivider("Flying Sparks", () -> screen.animatedOpen, () -> target[GuardParticleColors.FLYING_ENABLED]!=0, value -> target[GuardParticleColors.FLYING_ENABLED]=value?1:0, server, "Bursts of firework and electric sparks.");
         if(screen.animatedOpen) {
             screen.sliderBound(Control.FLYING_BASE_INTENSITY, "Base Intensity", () -> target[16], "%", 1, server, v -> target[16]=v, "Regular-parry amount. 100% starts with 100 sparks; 0% turns Flying Sparks off completely. Both appearances share the total.");
             screen.sliderBound(Control.FLYING_PERFECT_INTENSITY, "Perfect Intensity", () -> target[17], "%", 1, server, v -> target[17]=v, "Additional percentage of Base Intensity on perfect parries. 0% adds nothing; 100% doubles the base. Base Intensity 0 turns this effect off completely.");
@@ -182,7 +182,7 @@ final class GuardConfigPages {
             screen.particleAppearance(server,GuardParticleColors.BASE,GuardParticleColors.FLYING_SIZE_VARIANCE+1);
         }
 
-        screen.featureDivider("Spark Debris", () -> screen.dotStreaksOpen, () -> target[GuardParticleColors.DEBRIS_ENABLED]!=0, value -> target[GuardParticleColors.DEBRIS_ENABLED]=value?1:0, server, "Small debris sparks with immediate gravity, brief dotted tails, and diminishing bounces. On/Off preserves your settings.");
+        screen.featureDivider("Spark Debris", () -> screen.dotStreaksOpen, () -> target[GuardParticleColors.DEBRIS_ENABLED]!=0, value -> target[GuardParticleColors.DEBRIS_ENABLED]=value?1:0, server, "Falling sparks with dotted tails and small bounces.");
         if(screen.dotStreaksOpen) {
             screen.sliderBound(Control.DEBRIS_BASE_INTENSITY, "Debris Base Intensity", () -> target[19], "%", 1, server, v -> target[19]=v, "Regular-parry amount. 100% starts with 100 debris sparks; 0% turns Spark Debris off completely.");
             screen.sliderBound(Control.DEBRIS_PERFECT_INTENSITY, "Debris Perfect Intensity", () -> target[20], "%", 1, server, v -> target[20]=v, "Additional percentage of Base Intensity on perfect parries. 0% adds nothing; 100% doubles the base. Base Intensity 0 turns this effect off completely.");
@@ -191,7 +191,7 @@ final class GuardConfigPages {
         }
 
         int tracerOffset=GuardSparkTracerConfig.OFFSET;
-        screen.featureDivider("Spark Tracers", () -> screen.sparkTracersOpen, () -> target[GuardParticleColors.TRACER_ENABLED]!=0, value -> target[GuardParticleColors.TRACER_ENABLED]=value?1:0, server, "Upright tick-by-tick square trails. On/Off preserves your settings.");
+        screen.featureDivider("Spark Tracers", () -> screen.sparkTracersOpen, () -> target[GuardParticleColors.TRACER_ENABLED]!=0, value -> target[GuardParticleColors.TRACER_ENABLED]=value?1:0, server, "Square spark trails.");
         if(screen.sparkTracersOpen) {
             for(int k:GuardSparkTracerConfig.DISPLAY_ORDER) {
                 final int index=tracerOffset+k;
@@ -199,7 +199,7 @@ final class GuardConfigPages {
             }
             screen.particleAppearance(server,GuardParticleColors.TRACER_START_COLOR,GuardParticleColors.PREVIOUS_LENGTH);
         }
-        screen.featureDivider("Center Impact", () -> screen.centerImpactOpen, () -> target[GuardParticleColors.IMPACT_ENABLED]!=0, value -> target[GuardParticleColors.IMPACT_ENABLED]=value?1:0, server, "Six sharp frames disperse into fading arcs. Uses tracer colors. On/Off preserves your settings.");
+        screen.featureDivider("Center Impact", () -> screen.centerImpactOpen, () -> target[GuardParticleColors.IMPACT_ENABLED]!=0, value -> target[GuardParticleColors.IMPACT_ENABLED]=value?1:0, server, "A burst of fading arcs in tracer colors.");
         if(screen.centerImpactOpen)screen.particleAppearance(server,GuardParticleColors.IMPACT_SIZE,GuardParticleColors.IMPACT_DURATION+2);
 
     }
@@ -228,7 +228,7 @@ final class GuardConfigPages {
             screen.controls(d.parryHealing);
             screen.sliderBound(Control.PARRY_HEALING_HEARTS,"Parry Healing Amount",()->d.parryHealingHearts," hearts",1,true,v->d.parryHealingHearts=v,"Perfect parries heal this amount; regular parries heal half.");
             screen.controls(true);
-            screen.toggle(Control.RETALIATION_ENABLED,"Parry Retaliation",()->d.retaliationEnabled,v->{d.retaliationEnabled=v;screen.dirtyShield=true;},true,"Return damage on parries. Off preserves both multipliers; knockback remains separate.");
+            screen.toggle(Control.RETALIATION_ENABLED,"Parry Retaliation",()->d.retaliationEnabled,v->{d.retaliationEnabled=v;screen.dirtyShield=true;},true,"Return parried damage to the attacker.");
             screen.controls(d.retaliationEnabled);
             screen.sliderBound(Control.PARRY_RETALIATION,"Regular Retaliation",()->d.parryReturnPercent,"%",1,true,v->d.parryReturnPercent=v,"Percentage of regular-parried damage returned to the attacker.");
             screen.sliderBound(Control.PERFECT_RETALIATION,"Perfect Retaliation",()->d.perfectReturnPercent,"%",1,true,v->d.perfectReturnPercent=v,"Percentage of perfect-parried damage returned to the attacker.");
