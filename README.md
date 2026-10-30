@@ -1,1 +1,1 @@
-By ARR License, I don't allow forks or ports. Addons are allowed. 
+By ARR license, I don't allow redistribution of the mod through means that aren't approved by me. I don't allow the creation of ports or forks, or any modified version of the mod. You may create addons that depend on Mallard Guard.
