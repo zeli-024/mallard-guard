@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths-ignore:
       - '.github/workflows/**'
+      - 'README.md'
+      - 'docs/**'
   pull_request:
   workflow_dispatch:
     inputs:
@@ -42,6 +44,9 @@ jobs:
       - name: Prepare release metadata
         id: release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.publish_target != 'none'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PREVIOUS_SHA: ${{ github.event.before }}
         run: |
           python3 - <<'PY'
           import json
@@ -55,10 +60,20 @@ jobs:
           if len(matches) != 1 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]*', matches[0]):
               raise SystemExit('Expected one valid mod_version in gradle.properties.')
           version = matches[0]
+          notes = Path('release-notes') / f'{version}.md'
+          # Pushes publish only a version that is new to main and has its release notes.
+          if os.environ['EVENT_NAME'] == 'push':
+              previous = None
+              if subprocess.run(['git', 'fetch', '--depth=1', 'origin', os.environ['PREVIOUS_SHA']]).returncode == 0:
+                  shown = subprocess.run(['git', 'show', f"{os.environ['PREVIOUS_SHA']}:gradle.properties"], capture_output=True, text=True)
+                  if shown.returncode == 0:
+                      previous = re.findall(r'^mod_version=(\S+)\s*$', shown.stdout, re.MULTILINE)
+              if previous is None or version in previous or not notes.is_file():
+                  print(f'Not publishing {version}: it is not a new version with release notes.')
+                  raise SystemExit(0)
           jar = Path('build/libs') / f'mallardguard-{version}.jar'
           if not jar.is_file():
               raise SystemExit(f'Missing release JAR: {jar}')
-          notes = Path('release-notes') / f'{version}.md'
           changelog = notes.read_text(encoding='utf-8') if notes.is_file() else subprocess.check_output(
               ['git', 'log', '-1', '--pretty=%B'], text=True)
           lowered = version.lower()
@@ -96,7 +111,7 @@ jobs:
           print(f'Prepared {version} ({channel}) for Minecraft 1.21.1 / NeoForge.')
           PY
       - name: Upload to CurseForge
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.release.outcome == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish_target == 'all' || inputs.publish_target == 'curseforge') }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.release.outcome == 'success' && steps.release.outputs.version != '' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish_target == 'all' || inputs.publish_target == 'curseforge') }}
         env:
           CF_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
           RELEASE_JAR: ${{ steps.release.outputs.jar }}
@@ -112,7 +127,7 @@ jobs:
             --form "file=@$RELEASE_JAR" \
             'https://minecraft.curseforge.com/api/projects/1712570/upload-file'
       - name: Upload to Modrinth
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.release.outcome == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish_target == 'all' || inputs.publish_target == 'modrinth') }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.release.outcome == 'success' && steps.release.outputs.version != '' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish_target == 'all' || inputs.publish_target == 'modrinth') }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           RELEASE_JAR: ${{ steps.release.outputs.jar }}
